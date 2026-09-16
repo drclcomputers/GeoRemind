@@ -1,10 +1,10 @@
 # GeoRemind
 [![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/drclcomputers/GeoRemind)
 
-<p align="center" height="60%">
-  <img src="assets/img/1.png" width="30%" />
-  <img src="assets/img/2.png" width="30%" />
-  <img src="assets/img/3.png" width="30%" />
+<p align="center">
+  <img src="GeoRemind/assets/img/1.png" width="30%" />
+  <img src="GeoRemind/assets/img/2.png" width="30%" />
+  <img src="GeoRemind/assets/img/3.png" width="30%" />
 </p>
 
 GeoRemind is a location-based reminder application for iOS. It allows you to set reminders for specific geographic locations and receive a notification the moment you arrive in the area. This app is built entirely with SwiftUI, utilizing MapKit for mapping, CoreLocation for geofencing, and SwiftData for local data persistence.

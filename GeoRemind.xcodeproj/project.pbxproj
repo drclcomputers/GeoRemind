@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		924E279C305B111500654994 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 924E279B305B111000654994 /* README.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		9220EFA43058595900D64009 /* GeoRemind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GeoRemind.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		924E279B305B111000654994 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -47,6 +52,7 @@
 			children = (
 				9220EFA63058595900D64009 /* GeoRemind */,
 				9220EFA53058595900D64009 /* Products */,
+				924E279B305B111000654994 /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				924E279C305B111500654994 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
