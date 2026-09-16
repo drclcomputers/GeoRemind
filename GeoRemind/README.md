@@ -1,7 +1,7 @@
 # GeoRemind
 [![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/drclcomputers/GeoRemind)
 
-<p align="center">
+<p align="center" height="60%">
   <img src="assets/img/1.png" width="30%" />
   <img src="assets/img/2.png" width="30%" />
   <img src="assets/img/3.png" width="30%" />
