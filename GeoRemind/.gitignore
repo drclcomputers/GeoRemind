@@ -1,0 +1,5 @@
+.DS_Store, DerivedData/
+*.xcuserdata
+assets/icons
+assets/res.svg
+assets/res-2.svg
