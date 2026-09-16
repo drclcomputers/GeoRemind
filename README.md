@@ -20,9 +20,9 @@ GeoRemind is a location-based reminder application for iOS. It allows you to set
 -   **Onboarding & Permissions:** A clean onboarding flow for new users and helpful in-app banners to guide the setup of required location and notification permissions.
 
 <p align="center">
-  <img src="assets/img/4.png" width="30%" />
-  <img src="assets/img/5.png" width="30%" />
-  <img src="assets/img/6.png" width="30%" />
+  <img src="GeoRemind/assets/img/4.png" width="30%" />
+  <img src="GeoRemind/assets/img/5.png" width="30%" />
+  <img src="GeoRemind/assets/img/6.png" width="30%" />
 </p>
 
 ## Core Technologies
