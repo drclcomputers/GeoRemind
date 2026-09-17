@@ -22,7 +22,12 @@ struct Home: View {
 					MapScreen(showingAdd: $showingAdd)
 				}
 			}
-			Tab("Reminders", systemImage: "list.bullet", value: 1) {
+			Tab("GeoReminders", systemImage: "list.bullet", value: 1) {
+				NavigationStack {
+					RemindersScreen()
+				}
+			}
+			Tab("Profile", systemImage: "person", value: 2) {
 				NavigationStack {
 					Profile()
 				}

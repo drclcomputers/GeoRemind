@@ -65,7 +65,7 @@ struct MapScreen: View {
 				MapScaleView()
 				MapUserLocationButton()
 			}
-			.mapStyle(.standard(pointsOfInterest: .excludingAll))
+			.mapStyle(.standard())
 
 			Button {
 				showingAdd = true

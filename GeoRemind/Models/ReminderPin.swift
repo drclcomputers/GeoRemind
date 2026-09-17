@@ -12,15 +12,15 @@ import SwiftData
 @Model
 class ReminderPin {
 	var id: UUID = UUID()
-	var title: String
-	var desc: String
-	var latitude: Double
-	var longitude: Double
-	var radius: Double
-	var isActive: Bool
-	var timestamp: Date
-	var notifyOnEntry: Bool
-	var notifyOnExit: Bool
+	var title: String = ""
+	var desc: String = ""
+	var latitude: Double = 0.0
+	var longitude: Double = 0.0
+	var radius: Double = 0.0
+	var isActive: Bool = true
+	var timestamp: Date = Date.now
+	var notifyOnEntry: Bool = true
+	var notifyOnExit: Bool = false
 
 	init(
 		title: String,

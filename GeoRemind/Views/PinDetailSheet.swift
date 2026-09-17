@@ -41,12 +41,12 @@ struct PinDetailSheet: View {
 								MKCoordinateRegion(
 									center: pin.coordinate,
 									latitudinalMeters: max(
-										displayRadius * 4,
-										500
+										displayRadius * 3,
+										200
 									),
 									longitudinalMeters: max(
-										displayRadius * 4,
-										500
+										displayRadius * 3,
+										200
 									)
 								)
 							)
@@ -82,6 +82,9 @@ struct PinDetailSheet: View {
 						}
 					}
 					Toggle("Active", isOn: $pin.isActive)
+						.onChange(of: pin.isActive) {
+							GeofenceManager.shared.syncRegions()
+						}
 				}
 
 				Section("Radius") {
@@ -143,6 +146,7 @@ struct PinDetailSheet: View {
 							let flags = editedNotifyMode.flags
 							pin.notifyOnEntry = flags.entry
 							pin.notifyOnExit = flags.exit
+							GeofenceManager.shared.syncRegions()
 						} else {
 							editedTitle = pin.title
 							editedDesc = pin.desc

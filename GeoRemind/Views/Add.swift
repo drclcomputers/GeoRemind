@@ -56,8 +56,8 @@ struct Add: View {
 								.region(
 									MKCoordinateRegion(
 										center: coord,
-										latitudinalMeters: max(radius * 4, 500),
-										longitudinalMeters: max(radius * 4, 500)
+										latitudinalMeters: max(radius * 3, 200),
+										longitudinalMeters: max(radius * 3, 200)
 									)
 								)
 							)
