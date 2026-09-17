@@ -60,6 +60,10 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	}
 
 	func syncRegions(pins: [ReminderPin]? = nil) {
+		for region in manager.monitoredRegions {
+			manager.stopMonitoring(for: region)
+		}
+
 		let activePins: [ReminderPin]
 		if let pins {
 			activePins = pins.filter(\.isActive)
@@ -74,12 +78,7 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 
 		totalActiveCount = activePins.count
 
-		guard authorizationStatus == .authorizedAlways else {
-			for region in manager.monitoredRegions {
-				manager.stopMonitoring(for: region)
-			}
-			return
-		}
+		guard authorizationStatus == .authorizedAlways else { return }
 
 		let candidates: [ReminderPin]
 		if let lastLocation {
@@ -103,21 +102,8 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 			candidates = activePins
 		}
 
-		let desiredPins = Dictionary(
-			uniqueKeysWithValues: candidates.prefix(regionLimit).map {
-				($0.id.uuidString, $0)
-			}
-		)
-		let desiredIDs = Set(desiredPins.keys)
-		let currentIDs = Set(manager.monitoredRegions.map(\.identifier))
-
-		for region in manager.monitoredRegions
-		where !desiredIDs.contains(region.identifier) {
-			manager.stopMonitoring(for: region)
-		}
-
-		for id in desiredIDs.subtracting(currentIDs) {
-			guard let pin = desiredPins[id] else { continue }
+		for pin in candidates.prefix(regionLimit)
+		where pin.notifyOnEntry || pin.notifyOnExit {
 			let radius = min(
 				pin.radius,
 				manager.maximumRegionMonitoringDistance
@@ -125,10 +111,10 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 			let region = CLCircularRegion(
 				center: pin.coordinate,
 				radius: radius,
-				identifier: id
+				identifier: pin.id.uuidString
 			)
-			region.notifyOnEntry = true
-			region.notifyOnExit = false
+			region.notifyOnEntry = pin.notifyOnEntry
+			region.notifyOnExit = pin.notifyOnExit
 			manager.startMonitoring(for: region)
 		}
 	}
@@ -155,6 +141,22 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 
 	func locationManager(
 		_ manager: CLLocationManager,
+		didEnterRegion region: CLRegion
+	) {
+		guard let pin = activePin(for: region), pin.notifyOnEntry else { return }
+		sendNotification(for: pin, event: .arrival)
+	}
+
+	func locationManager(
+		_ manager: CLLocationManager,
+		didExitRegion region: CLRegion
+	) {
+		guard let pin = activePin(for: region), pin.notifyOnExit else { return }
+		sendNotification(for: pin, event: .departure)
+	}
+
+	func locationManager(
+		_ manager: CLLocationManager,
 		monitoringDidFailFor region: CLRegion?,
 		withError error: Error
 	) {
@@ -163,17 +165,47 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		)
 	}
 
-	private func sendArrivalNotification(for pin: ReminderPin) {
+	private func activePin(for region: CLRegion) -> ReminderPin? {
+		guard let context,
+			let uuid = UUID(uuidString: region.identifier)
+		else { return nil }
+
+		let descriptor = FetchDescriptor<ReminderPin>(
+			predicate: #Predicate { $0.id == uuid }
+		)
+		guard let pin = try? context.fetch(descriptor).first, pin.isActive
+		else { return nil }
+
+		return pin
+	}
+
+	private enum GeofenceEvent {
+		case arrival
+		case departure
+	}
+
+	private func sendNotification(for pin: ReminderPin, event: GeofenceEvent) {
 		let content = UNMutableNotificationContent()
-		content.title = pin.title
-		content.body =
-			pin.desc.isEmpty
-			? "You've arrived at this reminder's location." : pin.desc
+
+		switch event {
+		case .arrival:
+			content.title = pin.title
+			content.body =
+				pin.desc.isEmpty
+				? "Hey! You're in the proximity of this GeoReminder's location!"
+				: pin.desc
+		case .departure:
+			content.title = "Don't forget!"
+			content.body =
+				"Hey! Don't forget about your GeoReminder at \"\(pin.title)\"!"
+		}
+
 		content.sound = .default
 
+		let identifierPrefix = event == .arrival ? "arrival" : "departure"
 		let request = UNNotificationRequest(
 			identifier:
-				"arrival-\(pin.id.uuidString)-\(Date().timeIntervalSince1970)",
+				"\(identifierPrefix)-\(pin.id.uuidString)-\(Date().timeIntervalSince1970)",
 			content: content,
 			trigger: nil
 		)

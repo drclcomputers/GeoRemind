@@ -18,7 +18,18 @@ struct PinDetailSheet: View {
 	@State private var editedTitle = ""
 	@State private var editedDesc = ""
 	@State private var editedRadius: Double = 200
+	@State private var editedNotifyMode: NotifyMode = .arrival
 	@State private var showingDeleteConfirm = false
+
+	@FocusState private var focusedField: Field?
+
+	private enum Field {
+		case title, description
+	}
+
+	private var displayRadius: Double {
+		isEditing ? editedRadius : pin.radius
+	}
 
 	var body: some View {
 		NavigationStack {
@@ -29,14 +40,20 @@ struct PinDetailSheet: View {
 							.region(
 								MKCoordinateRegion(
 									center: pin.coordinate,
-									latitudinalMeters: max(pin.radius * 4, 500),
-									longitudinalMeters: max(pin.radius * 4, 500)
+									latitudinalMeters: max(
+										displayRadius * 4,
+										500
+									),
+									longitudinalMeters: max(
+										displayRadius * 4,
+										500
+									)
 								)
 							)
 						)
 					) {
 						Marker(pin.title, coordinate: pin.coordinate)
-						MapCircle(center: pin.coordinate, radius: pin.radius)
+						MapCircle(center: pin.coordinate, radius: displayRadius)
 							.foregroundStyle(Color.accentColor.opacity(0.15))
 							.stroke(Color.accentColor, lineWidth: 1)
 					}
@@ -44,17 +61,20 @@ struct PinDetailSheet: View {
 					.clipShape(RoundedRectangle(cornerRadius: 12))
 					.disabled(true)
 					.listRowInsets(EdgeInsets())
+					.animation(.easeInOut(duration: 0.2), value: editedRadius)
 				}
 
 				Section("Details") {
 					if isEditing {
 						TextField("Title", text: $editedTitle)
+							.focused($focusedField, equals: .title)
 						TextField(
-							"Desciption",
+							"Description",
 							text: $editedDesc,
 							axis: .vertical
 						)
 						.lineLimit(2...6)
+						.focused($focusedField, equals: .description)
 					} else {
 						LabeledContent("Title", value: pin.title)
 						if !pin.desc.isEmpty {
@@ -80,23 +100,57 @@ struct PinDetailSheet: View {
 						LabeledContent("Radius", value: "\(Int(pin.radius))m")
 					}
 				}
+
+				Section("Notify me on") {
+					if isEditing {
+						Picker("Notify me on", selection: $editedNotifyMode) {
+							ForEach(NotifyMode.allCases) { mode in
+								Text(mode.rawValue).tag(mode)
+							}
+						}
+						.pickerStyle(.segmented)
+					} else {
+						LabeledContent(
+							"Notify me on",
+							value: NotifyMode.from(
+								entry: pin.notifyOnEntry,
+								exit: pin.notifyOnExit
+							).rawValue
+						)
+					}
+				}
+
+				Section {
+					Button("Delete GeoReminder", role: .destructive) {
+						showingDeleteConfirm = true
+					}
+				}
 			}
+			.scrollDismissesKeyboard(.interactively)
+			.dismissesKeyboardOnTap()
 			.navigationTitle(pin.title.isEmpty ? "Reminder" : pin.title)
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
-				ToolbarItem(placement: .confirmationAction) {
+				ToolbarItem(placement: .cancellationAction) {
 					Button(isEditing ? "Cancel" : "Done") { dismiss() }
 				}
-				ToolbarItem(placement: .cancellationAction) {
+				ToolbarItem(placement: .confirmationAction) {
 					Button(isEditing ? "Save" : "Edit") {
 						if isEditing {
 							pin.title = editedTitle
 							pin.desc = editedDesc
 							pin.radius = editedRadius
+							let flags = editedNotifyMode.flags
+							pin.notifyOnEntry = flags.entry
+							pin.notifyOnExit = flags.exit
 						} else {
 							editedTitle = pin.title
 							editedDesc = pin.desc
 							editedRadius = pin.radius
+							editedNotifyMode = NotifyMode.from(
+								entry: pin.notifyOnEntry,
+								exit: pin.notifyOnExit
+							)
 						}
 						isEditing.toggle()
 					}

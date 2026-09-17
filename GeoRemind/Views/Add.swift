@@ -17,6 +17,7 @@ struct Add: View {
 	@State private var title = ""
 	@State private var desc = ""
 	@State private var radius: Double = 200
+	@State private var notifyMode: NotifyMode = .arrival
 	@State private var selectedCoordinate: CLLocationCoordinate2D?
 	@State private var selectedAddress: String = ""
 	@State private var showingSearch = false
@@ -55,8 +56,8 @@ struct Add: View {
 								.region(
 									MKCoordinateRegion(
 										center: coord,
-										latitudinalMeters: 500,
-										longitudinalMeters: 500
+										latitudinalMeters: max(radius * 4, 500),
+										longitudinalMeters: max(radius * 4, 500)
 									)
 								)
 							)
@@ -66,6 +67,11 @@ struct Add: View {
 									? "Selected Location" : selectedAddress,
 								coordinate: coord
 							)
+							MapCircle(center: coord, radius: radius)
+								.foregroundStyle(
+									Color.accentColor.opacity(0.15)
+								)
+								.stroke(Color.accentColor, lineWidth: 1)
 						}
 						.frame(height: 160)
 						.clipShape(RoundedRectangle(cornerRadius: 12))
@@ -73,6 +79,7 @@ struct Add: View {
 						.listRowInsets(EdgeInsets())
 						.padding(.horizontal, 4)
 						.padding(.vertical, 2)
+						.animation(.easeInOut(duration: 0.2), value: radius)
 
 						if !selectedAddress.isEmpty {
 							Text(selectedAddress)
@@ -116,8 +123,19 @@ struct Add: View {
 							Slider(value: $radius, in: 50...2000, step: 50)
 						}
 					}
+
+					Section("Notify me on") {
+						Picker("Notify me on", selection: $notifyMode) {
+							ForEach(NotifyMode.allCases) { mode in
+								Text(mode.rawValue).tag(mode)
+							}
+						}
+						.pickerStyle(.segmented)
+					}
 				}
 			}
+			.scrollDismissesKeyboard(.interactively)
+			.dismissesKeyboardOnTap()
 			.navigationTitle("New GeoReminder")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
@@ -151,12 +169,15 @@ struct Add: View {
 			return
 		}
 
+		let flags = notifyMode.flags
 		let pin = ReminderPin(
 			title: title,
 			desc: desc,
 			latitude: coordinate.latitude,
 			longitude: coordinate.longitude,
-			radius: radius
+			radius: radius,
+			notifyOnEntry: flags.entry,
+			notifyOnExit: flags.exit
 		)
 		context.insert(pin)
 
