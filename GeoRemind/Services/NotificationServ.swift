@@ -56,7 +56,7 @@ func requestNotificationPermission() {
 func sendPinAddedNotification(title: String) {
 	let content = UNMutableNotificationContent()
 	content.title = "GeoRemind"
-	content.body = "The reminder \"\(title)\" has been added."
+	content.body = "Hey! The GeoReminder \"\(title)\" has been added!"
 	content.sound = .default
 
 	let trigger = UNTimeIntervalNotificationTrigger(

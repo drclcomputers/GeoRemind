@@ -5,12 +5,10 @@
 //  Created by Dorneanu Denis on 14/09/2026.
 //
 
-import SwiftData
 import SwiftUI
 
 struct Home: View {
-	@Environment(\.modelContext) private var context
-	@Query private var pins: [ReminderPin]
+	@Environment(ReminderStore.self) private var reminders
 
 	@State private var selectedTab = 0
 	@State private var showingAdd = false
@@ -37,9 +35,10 @@ struct Home: View {
 			Add()
 		}
 		.task {
-			GeofenceManager.shared.configure(context: context)
+			GeofenceManager.shared.syncRegions(pins: reminders.pins)
+			await NotificationStatusMonitor.shared.refresh()
 		}
-		.onChange(of: pins) { _, newPins in
+		.onChange(of: reminders.pins) { _, newPins in
 			GeofenceManager.shared.syncRegions(pins: newPins)
 		}
 	}
@@ -47,4 +46,7 @@ struct Home: View {
 
 #Preview {
 	Home()
+		.environment(AuthService.shared)
+		.environment(ReminderStore.shared)
+		.environment(GroupStore.shared)
 }

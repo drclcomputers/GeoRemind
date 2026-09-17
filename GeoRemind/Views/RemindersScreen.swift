@@ -5,15 +5,15 @@
 //  Created by Dorneanu Denis on 17/09/2026.
 //
 
-import SwiftData
 import SwiftUI
 
 struct RemindersScreen: View {
-	@Query(sort: \ReminderPin.timestamp, order: .reverse) private var pins:
-		[ReminderPin]
-	@Environment(\.modelContext) private var context
+	@Environment(ReminderStore.self) private var reminders
+	@Environment(GroupStore.self) private var groups
 
 	@State private var selectedPin: ReminderPin?
+
+	private var pins: [ReminderPin] { reminders.pins }
 
 	var body: some View {
 		VStack(spacing: 0) {
@@ -45,9 +45,16 @@ struct RemindersScreen: View {
 									.frame(width: 10, height: 10)
 
 								VStack(alignment: .leading, spacing: 2) {
-									Text(pin.title)
-										.font(.headline)
-										.foregroundStyle(.primary)
+									HStack(spacing: 6) {
+										Text(pin.title)
+											.font(.headline)
+											.foregroundStyle(.primary)
+										if pin.groupId != nil {
+											Image(systemName: "person.2.fill")
+												.font(.caption2)
+												.foregroundStyle(.secondary)
+										}
+									}
 									if !pin.desc.isEmpty {
 										Text(pin.desc)
 											.font(.subheadline)
@@ -66,24 +73,33 @@ struct RemindersScreen: View {
 						}
 						.buttonStyle(.plain)
 						.swipeActions(edge: .trailing, allowsFullSwipe: true) {
-							Button(role: .destructive) {
-								context.delete(pin)
-							} label: {
-								Label("Delete", systemImage: "trash")
+							if pin.isOwnedByCurrentUser {
+								Button(role: .destructive) {
+									Task { await reminders.delete(pin) }
+								} label: {
+									Label("Delete", systemImage: "trash")
+								}
 							}
 						}
 						.swipeActions(edge: .leading) {
-							Button {
-								pin.isActive.toggle()
-								GeofenceManager.shared.syncRegions()
-							} label: {
-								Label(
-									pin.isActive ? "Deactivate" : "Activate",
-									systemImage: pin.isActive
-										? "bell.slash" : "bell"
-								)
+							if pin.isOwnedByCurrentUser {
+								Button {
+									Task {
+										await reminders.setActive(
+											pin,
+											isActive: !pin.isActive
+										)
+									}
+								} label: {
+									Label(
+										pin.isActive
+											? "Deactivate" : "Activate",
+										systemImage: pin.isActive
+											? "bell.slash" : "bell"
+									)
+								}
+								.tint(pin.isActive ? .gray : .accentColor)
 							}
-							.tint(pin.isActive ? .gray : .accentColor)
 						}
 					}
 				}
@@ -92,7 +108,7 @@ struct RemindersScreen: View {
 		}
 		.navigationTitle("GeoReminders")
 		.sheet(item: $selectedPin) { pin in
-			PinDetailSheet(pin: pin)
+			PinDetailSheet(pinId: pin.id)
 		}
 	}
 }
@@ -101,4 +117,6 @@ struct RemindersScreen: View {
 	NavigationStack {
 		RemindersScreen()
 	}
+	.environment(ReminderStore.shared)
+	.environment(GroupStore.shared)
 }

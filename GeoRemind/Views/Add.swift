@@ -7,11 +7,11 @@
 
 import CoreLocation
 import MapKit
-import SwiftData
 import SwiftUI
 
 struct Add: View {
-	@Environment(\.modelContext) private var context
+	@Environment(ReminderStore.self) private var reminders
+	@Environment(GroupStore.self) private var groups
 	@Environment(\.dismiss) private var dismiss
 
 	@State private var title = ""
@@ -20,9 +20,12 @@ struct Add: View {
 	@State private var notifyMode: NotifyMode = .arrival
 	@State private var selectedCoordinate: CLLocationCoordinate2D?
 	@State private var selectedAddress: String = ""
+	@State private var selectedGroupId: UUID?
 	@State private var showingSearch = false
 	@State private var showingValidationAlert = false
 	@State private var isLocating = false
+	@State private var isSaving = false
+	@State private var saveError: String?
 
 	@FocusState private var focusedField: Field?
 
@@ -33,6 +36,7 @@ struct Add: View {
 	private var canSave: Bool {
 		!title.trimmingCharacters(in: .whitespaces).isEmpty
 			&& selectedCoordinate != nil
+			&& !isSaving
 	}
 
 	var body: some View {
@@ -132,6 +136,17 @@ struct Add: View {
 						}
 						.pickerStyle(.segmented)
 					}
+
+					if !groups.groups.isEmpty {
+						Section("Share with") {
+							Picker("Share with", selection: $selectedGroupId) {
+								Text("Only me").tag(Optional<UUID>.none)
+								ForEach(groups.groups) { group in
+									Text(group.name).tag(Optional(group.id))
+								}
+							}
+						}
+					}
 				}
 			}
 			.scrollDismissesKeyboard(.interactively)
@@ -160,6 +175,17 @@ struct Add: View {
 			) {
 				Button("OK", role: .cancel) {}
 			}
+			.alert(
+				"Couldn't save",
+				isPresented: Binding(
+					get: { saveError != nil },
+					set: { if !$0 { saveError = nil } }
+				)
+			) {
+				Button("OK", role: .cancel) {}
+			} message: {
+				Text(saveError ?? "")
+			}
 		}
 	}
 
@@ -169,23 +195,32 @@ struct Add: View {
 			return
 		}
 
+		isSaving = true
 		let flags = notifyMode.flags
-		let pin = ReminderPin(
-			title: title,
-			desc: desc,
-			latitude: coordinate.latitude,
-			longitude: coordinate.longitude,
-			radius: radius,
-			notifyOnEntry: flags.entry,
-			notifyOnExit: flags.exit
-		)
-		context.insert(pin)
-
-		sendPinAddedNotification(title: title)
-		dismiss()
+		Task {
+			do {
+				try await reminders.add(
+					title: title,
+					desc: desc,
+					latitude: coordinate.latitude,
+					longitude: coordinate.longitude,
+					radius: radius,
+					notifyOnEntry: flags.entry,
+					notifyOnExit: flags.exit,
+					groupId: selectedGroupId
+				)
+				sendPinAddedNotification(title: title)
+				dismiss()
+			} catch {
+				saveError = error.localizedDescription
+			}
+			isSaving = false
+		}
 	}
 }
 
 #Preview {
 	Add()
+		.environment(ReminderStore.shared)
+		.environment(GroupStore.shared)
 }

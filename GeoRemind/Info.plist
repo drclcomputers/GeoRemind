@@ -4,9 +4,20 @@
 <dict>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>georemind</string>
+		</dict>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>ReemKufiFun-VariableFont_wght.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
 	</array>
 </dict>
 </plist>

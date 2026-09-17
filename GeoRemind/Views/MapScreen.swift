@@ -6,18 +6,18 @@
 //
 
 import MapKit
-import SwiftData
 import SwiftUI
 
 struct MapScreen: View {
 	@Binding var showingAdd: Bool
 
 	@Environment(\.scenePhase) private var scenePhase
+	@Environment(ReminderStore.self) private var reminders
 
-	@Query(sort: \ReminderPin.timestamp, order: .reverse) private var pins:
-		[ReminderPin]
 	@State private var position: MapCameraPosition = .automatic
 	@State private var selectedPin: ReminderPin?
+
+	private var pins: [ReminderPin] { reminders.pins }
 
 	var body: some View {
 		ZStack(alignment: .bottomTrailing) {
@@ -81,7 +81,7 @@ struct MapScreen: View {
 			.accessibilityLabel("Add Reminder")
 		}
 		.sheet(item: $selectedPin) { pin in
-			PinDetailSheet(pin: pin)
+			PinDetailSheet(pinId: pin.id)
 		}
 		.safeAreaInset(edge: .top) {
 			permissionBanner
@@ -171,4 +171,5 @@ struct PermissionBanner: View {
 	NavigationStack {
 		MapScreen(showingAdd: .constant(false))
 	}
+	.environment(ReminderStore.shared)
 }

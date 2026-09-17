@@ -7,14 +7,12 @@
 
 import CoreLocation
 import Observation
-import SwiftData
 import UserNotifications
 
 @Observable
 final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	static let shared = GeofenceManager()
 	private let manager = CLLocationManager()
-	private var context: ModelContext?
 
 	var authorizationStatus: CLAuthorizationStatus
 
@@ -24,16 +22,18 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	private let regionLimit = 20
 	private let candidateRadius: CLLocationDistance = 2400
 	private var lastLocation: CLLocationCoordinate2D?
+	private var cachedPins: [ReminderPin] = []
 
 	private override init() {
 		authorizationStatus = CLLocationManager().authorizationStatus
 		super.init()
 		manager.delegate = self
+		cachedPins = PinCache.load()
 	}
 
-	func configure(context: ModelContext) {
-		self.context = context
-		syncRegions()
+	func preload() {
+		cachedPins = PinCache.load()
+		syncRegions(pins: cachedPins)
 	}
 
 	func requestWhenInUseAuthorization() {
@@ -60,22 +60,15 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	}
 
 	func syncRegions(pins: [ReminderPin]? = nil) {
+		if let pins {
+			cachedPins = pins
+		}
+
 		for region in manager.monitoredRegions {
 			manager.stopMonitoring(for: region)
 		}
 
-		let activePins: [ReminderPin]
-		if let pins {
-			activePins = pins.filter(\.isActive)
-		} else if let context {
-			let descriptor = FetchDescriptor<ReminderPin>(
-				predicate: #Predicate { $0.isActive }
-			)
-			activePins = (try? context.fetch(descriptor)) ?? []
-		} else {
-			activePins = []
-		}
-
+		let activePins = cachedPins.filter(\.isActive)
 		totalActiveCount = activePins.count
 
 		guard authorizationStatus == .authorizedAlways else { return }
@@ -143,7 +136,9 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		_ manager: CLLocationManager,
 		didEnterRegion region: CLRegion
 	) {
-		guard let pin = activePin(for: region), pin.notifyOnEntry else { return }
+		guard let pin = activePin(for: region), pin.notifyOnEntry else {
+			return
+		}
 		sendNotification(for: pin, event: .arrival)
 	}
 
@@ -166,17 +161,9 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	}
 
 	private func activePin(for region: CLRegion) -> ReminderPin? {
-		guard let context,
-			let uuid = UUID(uuidString: region.identifier)
-		else { return nil }
-
-		let descriptor = FetchDescriptor<ReminderPin>(
-			predicate: #Predicate { $0.id == uuid }
-		)
-		guard let pin = try? context.fetch(descriptor).first, pin.isActive
-		else { return nil }
-
-		return pin
+		cachedPins.first {
+			$0.id.uuidString == region.identifier && $0.isActive
+		}
 	}
 
 	private enum GeofenceEvent {

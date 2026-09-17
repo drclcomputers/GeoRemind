@@ -7,22 +7,40 @@
 
 import CoreLocation
 import Foundation
-import SwiftData
 
-@Model
-class ReminderPin {
-	var id: UUID = UUID()
-	var title: String = ""
-	var desc: String = ""
-	var latitude: Double = 0.0
-	var longitude: Double = 0.0
-	var radius: Double = 0.0
-	var isActive: Bool = true
-	var timestamp: Date = Date.now
-	var notifyOnEntry: Bool = true
-	var notifyOnExit: Bool = false
+struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
+	var id: UUID
+	var ownerId: UUID
+	var groupId: UUID?
+	var title: String
+	var desc: String
+	var latitude: Double
+	var longitude: Double
+	var radius: Double
+	var isActive: Bool
+	var timestamp: Date
+	var notifyOnEntry: Bool
+	var notifyOnExit: Bool
+
+	enum CodingKeys: String, CodingKey {
+		case id
+		case ownerId
+		case groupId
+		case title
+		case desc = "description"
+		case latitude
+		case longitude
+		case radius
+		case isActive
+		case timestamp = "createdAt"
+		case notifyOnEntry
+		case notifyOnExit
+	}
 
 	init(
+		id: UUID = UUID(),
+		ownerId: UUID,
+		groupId: UUID? = nil,
 		title: String,
 		desc: String,
 		latitude: Double,
@@ -33,6 +51,9 @@ class ReminderPin {
 		notifyOnEntry: Bool = true,
 		notifyOnExit: Bool = false
 	) {
+		self.id = id
+		self.ownerId = ownerId
+		self.groupId = groupId
 		self.title = title
 		self.desc = desc
 		self.latitude = latitude
@@ -47,6 +68,43 @@ class ReminderPin {
 	var coordinate: CLLocationCoordinate2D {
 		CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
 	}
+
+	var isOwnedByCurrentUser: Bool {
+		ownerId == AuthService.shared.userId
+	}
+
+	func isOwned(by userId: UUID?) -> Bool {
+		guard let userId else { return false }
+		return ownerId == userId
+	}
+
+	var notifyMode: NotifyMode {
+		NotifyMode.from(entry: notifyOnEntry, exit: notifyOnExit)
+	}
+}
+
+struct ReminderInsert: Encodable {
+	var id: UUID
+	var ownerId: UUID
+	var groupId: UUID?
+	var title: String
+	var description: String
+	var latitude: Double
+	var longitude: Double
+	var radius: Double
+	var isActive: Bool
+	var notifyOnEntry: Bool
+	var notifyOnExit: Bool
+}
+
+struct ReminderUpdate: Encodable {
+	var title: String
+	var description: String
+	var radius: Double
+	var isActive: Bool
+	var notifyOnEntry: Bool
+	var notifyOnExit: Bool
+	var groupId: UUID?
 }
 
 enum NotifyMode: String, CaseIterable, Identifiable {
