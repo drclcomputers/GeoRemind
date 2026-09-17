@@ -12,6 +12,7 @@ import SwiftUI
 struct Add: View {
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(GroupStore.self) private var groups
+	@Environment(AuthService.self) private var auth
 	@Environment(\.dismiss) private var dismiss
 
 	@State private var title = ""
@@ -137,7 +138,7 @@ struct Add: View {
 						.pickerStyle(.segmented)
 					}
 
-					if !groups.groups.isEmpty {
+					if auth.isAuthenticated, !groups.groups.isEmpty {
 						Section("Share with") {
 							Picker("Share with", selection: $selectedGroupId) {
 								Text("Only me").tag(Optional<UUID>.none)
@@ -223,4 +224,5 @@ struct Add: View {
 	Add()
 		.environment(ReminderStore.shared)
 		.environment(GroupStore.shared)
+		.environment(AuthService.shared)
 }

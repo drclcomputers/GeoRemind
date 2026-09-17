@@ -12,10 +12,8 @@ enum SupabaseConfig {
 	static let url = URL(string: "https://fzrjaufdclqbkvfaeycs.supabase.co")!
 	static let anonKey = "sb_publishable_As9x_prAChIOEbIKtkz_0A_TILeYyX8"
 
-	static var oauthRedirectURL: URL {
-		let scheme = Bundle.main.bundleIdentifier ?? "app.georemind"
-		return URL(string: "\(scheme)://auth-callback")!
-	}
+	static let oauthScheme = "georemind"
+	static let oauthRedirectURL = URL(string: "georemind://auth-callback")!
 }
 
 enum JSONCoders {
@@ -47,9 +45,7 @@ enum JSONCoders {
 
 	private static let fractionalISO8601: ISO8601DateFormatter = {
 		let formatter = ISO8601DateFormatter()
-		formatter.formatOptions = [
-			.withInternetDateTime, .withFractionalSeconds,
-		]
+		formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 		return formatter
 	}()
 

@@ -92,8 +92,7 @@ struct RemindersScreen: View {
 									}
 								} label: {
 									Label(
-										pin.isActive
-											? "Deactivate" : "Activate",
+										pin.isActive ? "Deactivate" : "Activate",
 										systemImage: pin.isActive
 											? "bell.slash" : "bell"
 									)

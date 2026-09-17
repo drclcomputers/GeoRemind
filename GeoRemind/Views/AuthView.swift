@@ -10,6 +10,9 @@ import SwiftUI
 
 struct AuthView: View {
 	@Environment(AuthService.self) private var auth
+	@Environment(\.dismiss) private var dismiss
+	@Environment(\.webAuthenticationSession) private
+		var webAuthenticationSession
 
 	@State private var mode: Mode = .signIn
 	@State private var email = ""
@@ -80,14 +83,38 @@ struct AuthView: View {
 							.focused($focusedField, equals: .password)
 							.submitLabel(.go)
 							.onSubmit { focusedField = nil }
+
+						if mode == .signUp {
+							PasswordChecklist(password: password)
+						}
 					}
 					.padding(.horizontal, 32)
 
-					if let message = auth.errorMessage {
+					if let message = auth.infoMessage, !message.isEmpty {
 						Text(message)
-							.font(.footnote)
+							.font(.subheadline)
+							.foregroundStyle(.primary)
+							.multilineTextAlignment(.center)
+							.padding(12)
+							.frame(maxWidth: .infinity)
+							.background(
+								Color.accentColor.opacity(0.12),
+								in: RoundedRectangle(cornerRadius: 12)
+							)
+							.padding(.horizontal, 32)
+					}
+
+					if let message = auth.errorMessage, !message.isEmpty {
+						Text(message)
+							.font(.subheadline)
 							.foregroundStyle(.red)
 							.multilineTextAlignment(.center)
+							.padding(12)
+							.frame(maxWidth: .infinity)
+							.background(
+								Color.red.opacity(0.08),
+								in: RoundedRectangle(cornerRadius: 12)
+							)
 							.padding(.horizontal, 32)
 					}
 
@@ -108,6 +135,7 @@ struct AuthView: View {
 								)
 							}
 							isWorking = false
+							if auth.isAuthenticated { dismiss() }
 						}
 					} label: {
 						Text(
@@ -129,6 +157,7 @@ struct AuthView: View {
 						withAnimation {
 							mode = mode == .signIn ? .signUp : .signIn
 							auth.errorMessage = nil
+							auth.infoMessage = nil
 						}
 					} label: {
 						Text(
@@ -153,27 +182,35 @@ struct AuthView: View {
 					.padding(.horizontal, 32)
 
 					Button {
-						Task { await auth.signInWithGoogle() }
+						startOAuth(google: true)
 					} label: {
-						Label("Continue with Google", systemImage: "globe")
-							.fontWeight(.semibold)
-							.frame(maxWidth: .infinity)
-							.padding()
-							.background(
-								Color(.secondarySystemBackground),
-								in: Capsule()
-							)
+						Label {
+							Text("Continue with Google")
+								.fontWeight(.semibold)
+								.foregroundStyle(Color(.systemBackground))
+						} icon: {
+							Image("google")
+								.resizable()
+								.scaledToFit()
+								.frame(width: 20, height: 20)
+						}
+						.frame(maxWidth: .infinity)
+						.padding()
+						.background(Color.primary, in: Capsule())
 					}
 					.padding(.horizontal, 32)
 
 					Button {
-						Task { await auth.signInWithFacebook() }
+						startOAuth(google: false)
 					} label: {
-						HStack(spacing: 8) {
-							Text("f")
-								.font(.title3.bold())
+						Label {
 							Text("Continue with Facebook")
 								.fontWeight(.semibold)
+						} icon: {
+							Image("facebook")
+								.resizable()
+								.scaledToFit()
+								.frame(width: 20, height: 20)
 						}
 						.frame(maxWidth: .infinity)
 						.padding()
@@ -195,18 +232,94 @@ struct AuthView: View {
 			}
 			.scrollDismissesKeyboard(.interactively)
 			.scrollIndicators(.hidden)
-			.toolbar(.hidden, for: .navigationBar)
+			.navigationTitle("Sign In")
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbar {
+				ToolbarItem(placement: .cancellationAction) {
+					Button("Not now") { dismiss() }
+				}
+			}
+			.onChange(of: auth.isAuthenticated) { _, signedIn in
+				if signedIn { dismiss() }
+			}
+		}
+	}
+
+	private func startOAuth(google: Bool) {
+		Task {
+			let launch: (URL) async throws -> URL = { url in
+				try await webAuthenticationSession.authenticate(
+					using: url,
+					callbackURLScheme: SupabaseConfig.oauthScheme
+				)
+			}
+			if google {
+				await auth.signInWithGoogle(launchFlow: launch)
+			} else {
+				await auth.signInWithFacebook(launchFlow: launch)
+			}
+			if auth.isAuthenticated {
+				dismiss()
+			}
 		}
 	}
 
 	private var canSubmit: Bool {
-		let mail = !email.trimmingCharacters(in: .whitespaces).isEmpty
-		let pass = password.count >= 6
+		let mail = email.contains("@") && email.contains(".")
 		if mode == .signUp {
-			return mail && pass
+			return mail && PasswordRules.isValid(password)
 				&& username.trimmingCharacters(in: .whitespaces).count >= 3
 		}
-		return mail && pass
+		return mail && password.count >= 6
+	}
+}
+
+private enum PasswordRules {
+	static func check(_ password: String) -> (
+		length: Bool, upper: Bool, lower: Bool, digit: Bool, symbol: Bool
+	) {
+		(
+			password.count >= 8,
+			password.contains { $0.isUppercase && $0.isLetter },
+			password.contains { $0.isLowercase && $0.isLetter },
+			password.contains { $0.isNumber },
+			password.contains {
+				!$0.isLetter && !$0.isNumber && !$0.isWhitespace
+			}
+		)
+	}
+
+	static func isValid(_ password: String) -> Bool {
+		let rules = check(password)
+		return rules.length && rules.upper && rules.lower && rules.digit
+			&& rules.symbol
+	}
+}
+
+private struct PasswordChecklist: View {
+	let password: String
+
+	var body: some View {
+		let rules = PasswordRules.check(password)
+		VStack(alignment: .leading, spacing: 6) {
+			ruleRow("At least 8 characters", ok: rules.length)
+			ruleRow("One uppercase letter", ok: rules.upper)
+			ruleRow("One lowercase letter", ok: rules.lower)
+			ruleRow("One number", ok: rules.digit)
+			ruleRow("One symbol (!@#$…)", ok: rules.symbol)
+		}
+		.font(.footnote)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.padding(.top, 4)
+	}
+
+	private func ruleRow(_ text: String, ok: Bool) -> some View {
+		HStack(spacing: 8) {
+			Image(systemName: ok ? "checkmark.circle.fill" : "circle")
+				.foregroundStyle(ok ? Color.green : Color.secondary)
+			Text(text)
+				.foregroundStyle(ok ? Color.primary : Color.secondary)
+		}
 	}
 }
 

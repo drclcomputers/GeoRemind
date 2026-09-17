@@ -20,7 +20,7 @@ final class GroupStore {
 	var errorMessage: String?
 
 	private init() {}
-	
+
 	func clear() {
 		groups = []
 		membersByGroup = [:]
@@ -28,11 +28,14 @@ final class GroupStore {
 	}
 
 	func refresh() async {
+		guard AuthService.shared.isAuthenticated else {
+			clear()
+			return
+		}
 		isLoading = true
 		defer { isLoading = false }
 		do {
-			groups =
-				try await supabase
+			groups = try await supabase
 				.from("groups")
 				.select()
 				.order("created_at", ascending: false)
@@ -48,8 +51,7 @@ final class GroupStore {
 		guard let ownerId = AuthService.shared.userId else {
 			throw StoreError.notSignedIn
 		}
-		let created: GeoGroup =
-			try await supabase
+		let created: GeoGroup = try await supabase
 			.from("groups")
 			.insert(GroupInsert(name: name, ownerId: ownerId))
 			.select()
@@ -71,12 +73,9 @@ final class GroupStore {
 
 	func loadMembers(for groupId: UUID) async {
 		do {
-			let rows: [GroupMemberRow] =
-				try await supabase
+			let rows: [GroupMemberRow] = try await supabase
 				.from("group_members")
-				.select(
-					"group_id, user_id, role, joined_at, profiles(username, avatar_url)"
-				)
+				.select("group_id, user_id, role, joined_at, profiles(username, avatar_url)")
 				.eq("group_id", value: groupId)
 				.execute()
 				.value
@@ -90,8 +89,7 @@ final class GroupStore {
 		let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !trimmed.isEmpty else { return }
 
-		let matches: [UserProfile] =
-			try await supabase
+		let matches: [UserProfile] = try await supabase
 			.from("profiles")
 			.select()
 			.eq("username", value: trimmed)

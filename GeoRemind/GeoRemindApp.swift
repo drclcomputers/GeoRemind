@@ -43,10 +43,8 @@ struct RootView: View {
 				OnboardingView()
 			} else if auth.isRestoringSession {
 				ProgressView()
-			} else if auth.isAuthenticated {
-				Home()
 			} else {
-				AuthView()
+				Home()
 			}
 		}
 		.dismissesKeyboardOnTap()

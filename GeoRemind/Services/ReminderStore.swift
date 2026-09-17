@@ -26,27 +26,38 @@ final class ReminderStore {
 	}
 
 	func refresh() async {
+		guard AuthService.shared.isAuthenticated else {
+			pins = PinCache.load()
+			GeofenceManager.shared.syncRegions(pins: pins)
+			return
+		}
+
 		isLoading = true
 		defer { isLoading = false }
 		do {
-			let fetched: [ReminderPin] =
-				try await supabase
+			let cloud: [ReminderPin] = try await supabase
 				.from("reminders")
 				.select()
 				.order("created_at", ascending: false)
 				.execute()
 				.value
-			pins = fetched
-			PinCache.save(fetched)
-			GeofenceManager.shared.syncRegions(pins: fetched)
+			pins = cloud
+			PinCache.save(cloud)
+			GeofenceManager.shared.syncRegions(pins: cloud)
 			errorMessage = nil
+			startRealtime()
 		} catch {
 			errorMessage = error.localizedDescription
-			if pins.isEmpty {
-				pins = PinCache.load()
-				GeofenceManager.shared.syncRegions(pins: pins)
-			}
 		}
+	}
+
+	func handleSignedIn() async {
+		clear()
+		await refresh()
+	}
+
+	func handleSignedOut() {
+		clear()
 	}
 
 	func add(
@@ -57,18 +68,16 @@ final class ReminderStore {
 		radius: Double,
 		notifyOnEntry: Bool,
 		notifyOnExit: Bool,
-		groupId: UUID?
+		groupId: UUID?,
+		existingId: UUID? = nil
 	) async throws {
-		guard let ownerId = AuthService.shared.userId else {
-			throw StoreError.notSignedIn
-		}
-
-		let write = ReminderInsert(
-			id: UUID(),
+		let ownerId = AuthService.shared.userId ?? LocalIdentity.ownerId
+		let pin = ReminderPin(
+			id: existingId ?? UUID(),
 			ownerId: ownerId,
-			groupId: groupId,
+			groupId: AuthService.shared.isAuthenticated ? groupId : nil,
 			title: title,
-			description: desc,
+			desc: desc,
 			latitude: latitude,
 			longitude: longitude,
 			radius: radius,
@@ -77,20 +86,48 @@ final class ReminderStore {
 			notifyOnExit: notifyOnExit
 		)
 
-		let inserted: ReminderPin =
-			try await supabase
-			.from("reminders")
-			.insert(write)
-			.select()
-			.single()
-			.execute()
-			.value
-
-		pins.insert(inserted, at: 0)
+		if AuthService.shared.isAuthenticated {
+			let write = ReminderInsert(
+				id: pin.id,
+				ownerId: ownerId,
+				groupId: pin.groupId,
+				title: pin.title,
+				description: pin.desc,
+				latitude: pin.latitude,
+				longitude: pin.longitude,
+				radius: pin.radius,
+				isActive: true,
+				notifyOnEntry: pin.notifyOnEntry,
+				notifyOnExit: pin.notifyOnExit
+			)
+			let inserted: ReminderPin = try await supabase
+				.from("reminders")
+				.insert(write)
+				.select()
+				.single()
+				.execute()
+				.value
+			if let index = pins.firstIndex(where: { $0.id == inserted.id }) {
+				pins[index] = inserted
+			} else {
+				pins.insert(inserted, at: 0)
+			}
+		} else {
+			pins.insert(pin, at: 0)
+		}
 		persistAndSync()
 	}
 
 	func update(_ pin: ReminderPin) async throws {
+		if let index = pins.firstIndex(where: { $0.id == pin.id }) {
+			pins[index] = pin
+			persistAndSync()
+		}
+
+		guard AuthService.shared.isAuthenticated,
+			pin.ownerId == AuthService.shared.userId
+		else { return }
+
 		let write = ReminderUpdate(
 			title: pin.title,
 			description: pin.desc,
@@ -101,8 +138,7 @@ final class ReminderStore {
 			groupId: pin.groupId
 		)
 
-		let updated: ReminderPin =
-			try await supabase
+		let updated: ReminderPin = try await supabase
 			.from("reminders")
 			.update(write)
 			.eq("id", value: pin.id)
@@ -124,12 +160,14 @@ final class ReminderStore {
 			pins[index].isActive = isActive
 			persistAndSync()
 		}
+		guard AuthService.shared.isAuthenticated else { return }
 		try? await update(next)
 	}
 
 	func delete(_ pin: ReminderPin) async {
 		pins.removeAll { $0.id == pin.id }
 		persistAndSync()
+		guard AuthService.shared.isAuthenticated else { return }
 		try? await supabase
 			.from("reminders")
 			.delete()
@@ -205,4 +243,18 @@ enum PinCache {
 		guard let data = try? JSONCoders.encoder.encode(pins) else { return }
 		try? data.write(to: fileURL, options: [.atomic])
 	}
+}
+
+enum LocalIdentity {
+	static let ownerId: UUID = {
+		let key = "georemind.localOwnerId"
+		if let raw = UserDefaults.standard.string(forKey: key),
+			let id = UUID(uuidString: raw)
+		{
+			return id
+		}
+		let id = UUID()
+		UserDefaults.standard.set(id.uuidString, forKey: key)
+		return id
+	}()
 }

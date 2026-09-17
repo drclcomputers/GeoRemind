@@ -13,9 +13,11 @@ struct MapScreen: View {
 
 	@Environment(\.scenePhase) private var scenePhase
 	@Environment(ReminderStore.self) private var reminders
+	@Environment(AuthService.self) private var auth
 
 	@State private var position: MapCameraPosition = .automatic
 	@State private var selectedPin: ReminderPin?
+	@State private var showingAuth = false
 
 	private var pins: [ReminderPin] { reminders.pins }
 
@@ -83,6 +85,9 @@ struct MapScreen: View {
 		.sheet(item: $selectedPin) { pin in
 			PinDetailSheet(pinId: pin.id)
 		}
+		.sheet(isPresented: $showingAuth) {
+			AuthView()
+		}
 		.safeAreaInset(edge: .top) {
 			permissionBanner
 		}
@@ -135,6 +140,14 @@ struct MapScreen: View {
 					"Allow \"Always\" location to get reminders in the background.",
 				actionTitle: "Enable",
 				action: { GeofenceManager.shared.requestAlwaysAuthorization() }
+			)
+		} else if !auth.isAuthenticated {
+			PermissionBanner(
+				icon: "iphone",
+				message:
+					"Reminders stay on this iPhone. Sign in to sync and use groups.",
+				actionTitle: "Sign In",
+				action: { showingAuth = true }
 			)
 		}
 	}

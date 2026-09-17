@@ -13,6 +13,7 @@ struct PinDetailSheet: View {
 
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(GroupStore.self) private var groups
+	@Environment(AuthService.self) private var auth
 	@Environment(\.dismiss) private var dismiss
 
 	@State private var isEditing = false
@@ -161,7 +162,7 @@ struct PinDetailSheet: View {
 						}
 					}
 
-					if canEdit, !groups.groups.isEmpty {
+					if canEdit, auth.isAuthenticated, !groups.groups.isEmpty {
 						Section("Share with") {
 							if isEditing {
 								Picker(

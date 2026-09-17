@@ -70,7 +70,10 @@ struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
 	}
 
 	var isOwnedByCurrentUser: Bool {
-		ownerId == AuthService.shared.userId
+		if let userId = AuthService.shared.userId {
+			return ownerId == userId
+		}
+		return ownerId == LocalIdentity.ownerId
 	}
 
 	func isOwned(by userId: UUID?) -> Bool {
