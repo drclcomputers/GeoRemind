@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		924E279C305B111500654994 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 924E279B305B111000654994 /* README.md */; };
+		92EC38D9305C0C1100B52EB2 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 92EC3848305C0C1100B52EB2 /* .gitignore */; };
 		92EC38E1305C450C00B52EB2 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 92EC38E0305C450C00B52EB2 /* Auth */; };
 		92EC38E3305C450C00B52EB2 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 92EC38E2305C450C00B52EB2 /* PostgREST */; };
 		92EC38E5305C450C00B52EB2 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 92EC38E4305C450C00B52EB2 /* Realtime */; };
@@ -17,6 +18,7 @@
 /* Begin PBXFileReference section */
 		9220EFA43058595900D64009 /* GeoRemind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GeoRemind.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		924E279B305B111000654994 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		92EC3848305C0C1100B52EB2 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -61,6 +63,7 @@
 				9220EFA63058595900D64009 /* GeoRemind */,
 				9220EFA53058595900D64009 /* Products */,
 				924E279B305B111000654994 /* README.md */,
+				92EC3848305C0C1100B52EB2 /* .gitignore */,
 				92EC38EC305C603E00B52EB2 /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -152,6 +155,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				924E279C305B111500654994 /* README.md in Resources */,
+				92EC38D9305C0C1100B52EB2 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,0 +1,7 @@
+.DS_Store, DerivedData/
+*.xcuserdata
+GeoRemind/assets/icons
+GeoRemind/assets/res.svg
+GeoRemind/assets/res-2.svg
+GeoRemind/Debug/
+GeoRemind/TODO.md
