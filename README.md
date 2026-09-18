@@ -1,74 +1,67 @@
 # GeoRemind
-[![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/drclcomputers/GeoRemind)
+
+Location reminders on a map. You drop a pin, set a radius, and the phone pings you when you get there (or when you leave). No time, no calendar — just place.
 
 <p align="center">
   <img src="GeoRemind/assets/img/1.png" width="30%" />
   <img src="GeoRemind/assets/img/2.png" width="30%" />
   <img src="GeoRemind/assets/img/3.png" width="30%" />
 </p>
+<p align="center">
+  <sub>1. Map with pins and geofence circles &nbsp;·&nbsp; 2. New reminder (radius + group) &nbsp;·&nbsp; 3. Reminders list</sub>
+</p>
 
-GeoRemind is a location-based reminder application for iOS. It allows you to set reminders for specific geographic locations and receive a notification the moment you arrive in the area. This app is built entirely with SwiftUI, utilizing MapKit for mapping, CoreLocation for geofencing, and SwiftData for local data persistence.
+You can use it without an account — everything stays on that iPhone. Sign in (email, Google, or Facebook) if you want sync and groups.
 
-## Features
+## What it does
 
--   **Location-Based Reminders:** Create reminders with a title, description, and a customizable radius around a chosen location.
--   **Interactive Map:** View all your active and inactive reminders pinned on an interactive map, visually representing their trigger areas.
--   **Reminder Management:** A comprehensive list to view, edit, delete, and quickly activate or deactivate reminders.
--   **Address Search:** Find and pin locations for your reminders with an integrated address and point-of-interest search.
--   **Smart Geofencing:** To work within the iOS limit of 20 monitored regions, the app intelligently prioritizes and monitors only the closest active reminders to your current location.
--   **Arrival Notifications:** Get notified as soon as you enter a reminder's designated geofence.
--   **Onboarding & Permissions:** A clean onboarding flow for new users and helpful in-app banners to guide the setup of required location and notification permissions.
+- Pins on the map, each with a visible radius. Grey = off, accent = watching.
+- Search a place or use your current location. Radius is a slider, 50 m to 2 km.
+- Arrival, departure, or both.
+- List tab: swipe to delete / toggle. Pull to refresh. Shared pins show a little group icon.
+- Groups: invite people with a 6-character code, not by adding their username. Shared reminders show up on everyone's map. Kick someone and their group pins become personal again — they keep them, the group doesn't.
+- Profile: username, photo, groups, join-by-code.
+- Settings: light / dark / system, metric or imperial, sign out, delete account.
+
+iOS only lets an app monitor **20** regions in the background. GeoRemind keeps the closest active ones (roughly within 2.4 km) and reshuffles when you move.
 
 <p align="center">
   <img src="GeoRemind/assets/img/4.png" width="30%" />
   <img src="GeoRemind/assets/img/5.png" width="30%" />
   <img src="GeoRemind/assets/img/6.png" width="30%" />
 </p>
+<p align="center">
+  <sub>4. Profile / groups &nbsp;·&nbsp; 5. Sign in (optional) &nbsp;·&nbsp; 6. Settings</sub>
+</p>
 
-## Core Technologies
+## Stack
 
--   **UI:** SwiftUI
--   **Data Persistence:** SwiftData
--   **Maps & Location:** MapKit, CoreLocation
--   **Notifications:** UserNotifications
+SwiftUI. MapKit and CoreLocation for the map and geofences. UserNotifications for the ping. Supabase for auth, Postgres, storage (avatars), optional realtime.
 
-## How It Works
+Local cache on disk so geofences still work if the network is gone. Row-level security on the server: you write your own reminders; group members can read shared ones.
 
-GeoRemind leverages several key iOS frameworks to deliver a seamless experience:
+## Layout
 
--   **Data Persistence:** All reminders are stored locally using a `ReminderPin` model managed by **SwiftData**.
--   **Geofencing:** The `GeofenceManager` is the heart of the app. It uses `CLLocationManager` to monitor `CLCircularRegion`s. It dynamically updates the set of monitored regions based on the user's significant location changes, ensuring that only the nearest 20 active reminders are tracked to optimize system resources.
--   **Notifications:** The app uses `UNUserNotificationCenter` to request permission and deliver alerts. Arrival notifications are triggered by the `CLLocationManagerDelegate` when the device enters a monitored region.
--   **User Interface:** The entire UI is built with SwiftUI. A `TabView` provides easy navigation between the `MapScreen` and the `Profile` (reminders list). Modals are used for adding and editing reminders.
+```
+GeoRemind/
+  Views/        map, list, add, profile, auth, settings, group sheet
+  Services/     geofence, auth, reminders, groups, search, notifications
+  Models/       ReminderPin, profiles / groups / invites
+```
 
-## Project Structure
+`GeofenceManager` owns `CLCircularRegion`s. `ReminderStore` / `GroupStore` talk to Supabase (or the local cache if you're a guest). `AuthService` is email + OAuth.
 
-The codebase is organized into a standard SwiftUI application structure for clarity and maintainability.
+## Run it
 
--   `Models/`: Contains the `ReminderPin` SwiftData model.
--   `Views/`: Contains all SwiftUI views, such as `MapScreen`, `Profile` (the reminder list), `Add`, and the `Onboarding` flow.
--   `Services/`: Encapsulates the core logic and interactions with system frameworks.
-    -   `GeofenceManagerServ.swift`: Manages all geofencing logic, region monitoring, and location permission status.
-    -   `LocationServ.swift`: Provides helper functions for fetching the user's current location.
-    -   `NotificationServ.swift`: Handles notification permissions and the creation of notification requests.
-    -   `SearchServ.swift`: Powers the location search feature by interfacing with `MKLocalSearchCompleter`.
--   `GeoRemindApp.swift`: The main entry point of the app, which handles the initial view logic (onboarding vs. home) and sets up the SwiftData container.
+1. Clone, open `GeoRemind.xcodeproj`.
+2. Add the [Supabase Swift](https://github.com/supabase/supabase-swift) package if Xcode hasn't resolved it.
+3. URL scheme `georemind` is already in the project (OAuth callback).
+4. Real device if you actually want geofences. Simulator is fine for UI.
 
-## How to Run
+You need your own Supabase project (auth providers, `profiles` / `groups` / `group_members` / `reminders` / `group_invites`, avatars bucket, RLS). The anon key in the client is the publishable one — RLS is what keeps other people out of your rows.
 
-1.  Clone the repository to your local machine:
-    ```bash
-    git clone https://github.com/drclcomputers/GeoRemind.git
-    ```
-2.  Navigate to the project directory and open `GeoRemind.xcodeproj` in Xcode.
-3.  Select a target simulator or a physical iOS device.
-4.  Build and run the project (Cmd+R).
+## Permissions
 
-*Note: For testing geofencing features, using a physical device is highly recommended.*
-
-## Required Permissions
-
-For full functionality, GeoRemind requires the following user permissions:
-
--   **Location Services:** The app requests "When In Use" permission during onboarding. For reminders to trigger while the app is in the background, users will be prompted to grant "Always" access.
--   **Notifications:** Permission is required to alert you when you arrive at a reminder's location.
+- **Location:** When In Use at first. **Always** if you want pings while the app is closed.
+- **Notifications:** otherwise the geofence fires and nobody hears it.
+- **Photos:** only if you change the profile picture.
