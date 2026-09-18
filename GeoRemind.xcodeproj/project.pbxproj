@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		92411846305D909700D25A71 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 92411845305D909700D25A71 /* Storage */; };
 		92411848305DB6B100D25A71 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 92411847305DB6AC00D25A71 /* LICENSE */; };
+		92411856305DC4D200D25A71 /* SUPABASE_CONFIG.md in Resources */ = {isa = PBXBuildFile; fileRef = 92411855305DC4C000D25A71 /* SUPABASE_CONFIG.md */; };
 		924E279C305B111500654994 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 924E279B305B111000654994 /* README.md */; };
 		92EC38D9305C0C1100B52EB2 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 92EC3848305C0C1100B52EB2 /* .gitignore */; };
 		92EC38E1305C450C00B52EB2 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 92EC38E0305C450C00B52EB2 /* Auth */; };
@@ -20,6 +21,7 @@
 /* Begin PBXFileReference section */
 		9220EFA43058595900D64009 /* GeoRemind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GeoRemind.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		92411847305DB6AC00D25A71 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		92411855305DC4C000D25A71 /* SUPABASE_CONFIG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SUPABASE_CONFIG.md; sourceTree = "<group>"; };
 		924E279B305B111000654994 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		92EC3848305C0C1100B52EB2 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -67,6 +69,7 @@
 				9220EFA63058595900D64009 /* GeoRemind */,
 				9220EFA53058595900D64009 /* Products */,
 				924E279B305B111000654994 /* README.md */,
+				92411855305DC4C000D25A71 /* SUPABASE_CONFIG.md */,
 				92411847305DB6AC00D25A71 /* LICENSE */,
 				92EC3848305C0C1100B52EB2 /* .gitignore */,
 				92EC38EC305C603E00B52EB2 /* Frameworks */,
@@ -162,6 +165,7 @@
 			files = (
 				924E279C305B111500654994 /* README.md in Resources */,
 				92EC38D9305C0C1100B52EB2 /* .gitignore in Resources */,
+				92411856305DC4D200D25A71 /* SUPABASE_CONFIG.md in Resources */,
 				92411848305DB6B100D25A71 /* LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
