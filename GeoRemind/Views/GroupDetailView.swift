@@ -13,13 +13,16 @@ struct GroupDetailView: View {
 	@Environment(GroupStore.self) private var groups
 	@Environment(\.dismiss) private var dismiss
 
-	@State private var usernameToAdd = ""
-	@State private var isAdding = false
-	@State private var addError: String?
+	@State private var isCreatingInvite = false
+	@State private var inviteError: String?
 	@State private var showingDelete = false
 
 	private var members: [GroupMember] {
 		groups.membersByGroup[group.id] ?? []
+	}
+
+	private var invites: [GroupInvite] {
+		groups.invitesByGroup[group.id] ?? []
 	}
 
 	var body: some View {
@@ -48,39 +51,80 @@ struct GroupDetailView: View {
 				}
 
 				if group.isOwnedByCurrentUser {
-					Section("Add member") {
-						TextField("Username", text: $usernameToAdd)
-							.textInputAutocapitalization(.never)
-							.autocorrectionDisabled()
+					Section {
 						Button {
-							let name = usernameToAdd.trimmingCharacters(
-								in: .whitespaces
-							)
-							guard !name.isEmpty else { return }
-							isAdding = true
+							isCreatingInvite = true
 							Task {
 								do {
-									try await groups.addMember(
-										username: name,
-										to: group.id
+									_ = try await groups.createInvite(
+										for: group.id
 									)
-									usernameToAdd = ""
-									addError = nil
+									inviteError = nil
 								} catch {
-									addError = error.localizedDescription
+									inviteError = error.localizedDescription
 								}
-								isAdding = false
+								isCreatingInvite = false
 							}
 						} label: {
-							Text(isAdding ? "Adding…" : "Add")
+							Label(
+								isCreatingInvite
+									? "Creating…" : "New invite code",
+								systemImage: "key"
+							)
 						}
-						.disabled(isAdding || usernameToAdd.isEmpty)
+						.disabled(isCreatingInvite)
 
-						if let addError {
-							Text(addError)
+						ForEach(invites) { invite in
+							VStack(alignment: .leading, spacing: 6) {
+								HStack {
+									Text(invite.code)
+										.font(.title3.monospaced())
+										.textSelection(.enabled)
+									Spacer()
+									if invite.isExpired {
+										Text("Expired")
+											.font(.caption)
+											.foregroundStyle(.secondary)
+									} else {
+										Text("\(invite.useCount) joined")
+											.font(.caption)
+											.foregroundStyle(.secondary)
+									}
+								}
+								ShareLink(
+									item:
+										"Join my GeoRemind group \"\(group.name)\" with code \(invite.code)!"
+								) {
+									Label(
+										"Share",
+										systemImage: "square.and.arrow.up"
+									)
+								}
+								.buttonStyle(.borderless)
+							}
+							.swipeActions(
+								edge: .trailing,
+								allowsFullSwipe: true
+							) {
+								Button("Revoke", role: .destructive) {
+									Task {
+										await groups.revokeInvite(invite)
+									}
+								}
+							}
+						}
+
+						if let inviteError {
+							Text(inviteError)
 								.font(.footnote)
 								.foregroundStyle(.red)
 						}
+					} header: {
+						Text("Invites")
+					} footer: {
+						Text(
+							"Share the code. People type it in Profile to join. Codes expire after 7 days. Swipe a code to revoke it."
+						)
 					}
 
 					Section {
@@ -108,6 +152,9 @@ struct GroupDetailView: View {
 			}
 			.task {
 				await groups.loadMembers(for: group.id)
+				if group.isOwnedByCurrentUser {
+					await groups.loadInvites(for: group.id)
+				}
 			}
 			.confirmationDialog(
 				"Delete this group?",

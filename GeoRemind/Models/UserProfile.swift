@@ -76,3 +76,34 @@ struct GroupMemberInsert: Encodable {
 	var userId: UUID
 	var role: String
 }
+
+struct GroupInvite: Identifiable, Codable, Equatable, Hashable {
+	var id: UUID
+	var groupId: UUID
+	var code: String
+	var createdBy: UUID
+	var createdAt: Date?
+	var expiresAt: Date?
+	var maxUses: Int?
+	var useCount: Int
+
+	var shareURL: URL {
+		URL(string: "georemind://join/\(code)")!
+	}
+
+	var isExpired: Bool {
+		guard let expiresAt else { return false }
+		return expiresAt < Date()
+	}
+}
+
+struct GroupInviteInsert: Encodable {
+	var groupId: UUID
+	var code: String
+	var createdBy: UUID
+	var expiresAt: Date
+}
+
+struct JoinGroupParams: Encodable {
+	var invite_code: String
+}

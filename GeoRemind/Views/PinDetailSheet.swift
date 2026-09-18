@@ -14,6 +14,7 @@ struct PinDetailSheet: View {
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(GroupStore.self) private var groups
 	@Environment(AuthService.self) private var auth
+	@Environment(AppSettings.self) private var settings
 	@Environment(\.dismiss) private var dismiss
 
 	@State private var isEditing = false
@@ -126,7 +127,7 @@ struct PinDetailSheet: View {
 					Section("Radius") {
 						if isEditing {
 							VStack(alignment: .leading, spacing: 8) {
-								Text("\(Int(editedRadius)) m")
+								Text(settings.formatDistance(editedRadius))
 									.font(.subheadline.monospacedDigit())
 									.foregroundStyle(.secondary)
 								Slider(
@@ -138,7 +139,7 @@ struct PinDetailSheet: View {
 						} else {
 							LabeledContent(
 								"Radius",
-								value: "\(Int(pin.radius))m"
+								value: settings.formatDistance(pin.radius)
 							)
 						}
 					}
@@ -162,27 +163,30 @@ struct PinDetailSheet: View {
 						}
 					}
 
-					if canEdit, auth.isAuthenticated, !groups.groups.isEmpty {
-						Section("Share with") {
+					if canEdit, auth.isAuthenticated {
+						Section {
 							if isEditing {
 								Picker(
-									"Share with",
+									"Group",
 									selection: $editedGroupId
 								) {
-									Text("Only me").tag(Optional<UUID>.none)
+									Text("Personal").tag(Optional<UUID>.none)
 									ForEach(groups.groups) { group in
 										Text(group.name).tag(Optional(group.id))
 									}
 								}
+								.pickerStyle(.menu)
 							} else if let groupId = pin.groupId,
 								let group = groups.groups.first(where: {
 									$0.id == groupId
 								})
 							{
-								LabeledContent("Shared with", value: group.name)
+								LabeledContent("Group", value: group.name)
 							} else {
-								LabeledContent("Shared with", value: "Only me")
+								LabeledContent("Group", value: "Personal")
 							}
+						} header: {
+							Text("Visible to")
 						}
 					}
 
@@ -248,6 +252,11 @@ struct PinDetailSheet: View {
 					Button("OK", role: .cancel) {}
 				} message: {
 					Text(saveError ?? "")
+				}
+				.task {
+					if auth.isAuthenticated {
+						await groups.refresh()
+					}
 				}
 			} else {
 				ContentUnavailableView(

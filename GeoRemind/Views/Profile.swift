@@ -5,7 +5,9 @@
 //  Created by Dorneanu Denis on 14/09/2026.
 //
 
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct Profile: View {
 	@Environment(AuthService.self) private var auth
@@ -16,24 +18,27 @@ struct Profile: View {
 	@State private var showingCreateGroup = false
 	@State private var newGroupName = ""
 	@State private var selectedGroup: GeoGroup?
-	@State private var showingSignOut = false
 	@State private var showingAuth = false
+	@State private var showingSettings = false
+	@State private var avatarItem: PhotosPickerItem?
+	@State private var isUploadingAvatar = false
+	@State private var inviteCode = ""
 
 	var body: some View {
 		List {
 			if auth.isAuthenticated {
 				accountSection
 				groupsSection
-				Section {
-					Button("Sign Out", role: .destructive) {
-						showingSignOut = true
-					}
-				}
 			} else {
 				guestSection
 			}
 		}
 		.navigationTitle("Profile")
+		.settingsAccess(isPresented: $showingSettings)
+		.onChange(of: avatarItem) { _, item in
+			guard let item else { return }
+			Task { await uploadAvatar(item) }
+		}
 		.task {
 			if auth.isAuthenticated {
 				await groups.refresh()
@@ -52,16 +57,6 @@ struct Profile: View {
 				let name = newGroupName.trimmingCharacters(in: .whitespaces)
 				guard !name.isEmpty else { return }
 				Task { try? await groups.createGroup(name: name) }
-			}
-			Button("Cancel", role: .cancel) {}
-		}
-		.confirmationDialog(
-			"Sign out?",
-			isPresented: $showingSignOut,
-			titleVisibility: .visible
-		) {
-			Button("Sign Out", role: .destructive) {
-				Task { await auth.signOut() }
 			}
 			Button("Cancel", role: .cancel) {}
 		}
@@ -107,7 +102,11 @@ struct Profile: View {
 	private var accountSection: some View {
 		Section {
 			HStack(spacing: 14) {
-				avatar
+				PhotosPicker(selection: $avatarItem, matching: .images) {
+					avatar
+				}
+				.buttonStyle(.plain)
+				.disabled(isUploadingAvatar)
 				VStack(alignment: .leading, spacing: 4) {
 					Text(auth.profile?.username ?? "GeoRemind user")
 						.font(.headline)
@@ -145,8 +144,8 @@ struct Profile: View {
 				}
 			}
 
-			if let message = auth.errorMessage, isEditingUsername,
-				!message.isEmpty
+			if let message = auth.errorMessage,
+				isEditingUsername || isUploadingAvatar, !message.isEmpty
 			{
 				Text(message)
 					.font(.footnote)
@@ -194,20 +193,117 @@ struct Profile: View {
 			} label: {
 				Label("New Group", systemImage: "plus")
 			}
+
+			HStack {
+				TextField("Invite code", text: $inviteCode)
+					.textInputAutocapitalization(.characters)
+					.autocorrectionDisabled()
+					.font(.body.monospaced())
+				Button("Join") {
+					let code = inviteCode
+					inviteCode = ""
+					Task { await groups.join(code: code) }
+				}
+				.disabled(
+					inviteCode.trimmingCharacters(in: .whitespaces).isEmpty
+				)
+			}
+
+			if let message = groups.infoMessage, !message.isEmpty {
+				Text(message)
+					.font(.footnote)
+					.foregroundStyle(.secondary)
+			}
+			if let message = groups.errorMessage, !message.isEmpty {
+				Text(message)
+					.font(.footnote)
+					.foregroundStyle(.red)
+			}
 		}
 	}
 
 	private var avatar: some View {
+		ZStack(alignment: .bottomTrailing) {
+			Group {
+				if let urlString = auth.profile?.avatarUrl,
+					let url = URL(string: urlString)
+				{
+					AsyncImage(url: url) { phase in
+						switch phase {
+						case .success(let image):
+							image
+								.resizable()
+								.scaledToFill()
+						default:
+							avatarPlaceholder
+						}
+					}
+				} else {
+					avatarPlaceholder
+				}
+			}
+			.frame(width: 56, height: 56)
+			.clipShape(Circle())
+			.overlay {
+				if isUploadingAvatar {
+					Circle().fill(.black.opacity(0.35))
+					ProgressView()
+						.tint(.white)
+				}
+			}
+
+			Image(systemName: "camera.fill")
+				.font(.system(size: 9, weight: .bold))
+				.foregroundStyle(.white)
+				.padding(5)
+				.background(Color.accentColor, in: Circle())
+				.offset(x: 2, y: 2)
+		}
+		.accessibilityLabel("Change profile photo")
+	}
+
+	private var avatarPlaceholder: some View {
 		let letter =
 			(auth.profile?.username ?? "?").prefix(1).uppercased()
 		return ZStack {
 			Circle()
 				.fill(Color.accentColor.opacity(0.2))
-				.frame(width: 56, height: 56)
 			Text(letter)
 				.font(.title2.bold())
 				.foregroundStyle(Color.accentColor)
 		}
+	}
+
+	private func uploadAvatar(_ item: PhotosPickerItem) async {
+		isUploadingAvatar = true
+		defer {
+			isUploadingAvatar = false
+			avatarItem = nil
+		}
+		do {
+			guard let data = try await item.loadTransferable(type: Data.self),
+				let jpeg = compressedJPEG(from: data)
+			else { return }
+			_ = await auth.updateAvatar(imageData: jpeg)
+		} catch {
+			auth.errorMessage = "Couldn't read that photo."
+		}
+	}
+
+	private func compressedJPEG(from data: Data) -> Data? {
+		guard let image = UIImage(data: data) else { return nil }
+		let maxDimension: CGFloat = 512
+		let longest = max(image.size.width, image.size.height)
+		let scale = min(1, maxDimension / longest)
+		let size = CGSize(
+			width: image.size.width * scale,
+			height: image.size.height * scale
+		)
+		let renderer = UIGraphicsImageRenderer(size: size)
+		let rendered = renderer.image { _ in
+			image.draw(in: CGRect(origin: .zero, size: size))
+		}
+		return rendered.jpegData(compressionQuality: 0.8)
 	}
 }
 
@@ -217,4 +313,5 @@ struct Profile: View {
 	}
 	.environment(AuthService.shared)
 	.environment(GroupStore.shared)
+	.environment(AppSettings.shared)
 }

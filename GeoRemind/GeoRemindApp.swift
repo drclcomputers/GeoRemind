@@ -26,8 +26,15 @@ struct GeoRemindApp: App {
 				.environment(AuthService.shared)
 				.environment(ReminderStore.shared)
 				.environment(GroupStore.shared)
+				.environment(AppSettings.shared)
 				.onOpenURL { url in
-					Task { await AuthService.shared.handleOpenURL(url) }
+					Task {
+						if url.host == "join" {
+							await GroupStore.shared.handleInviteURL(url)
+						} else {
+							await AuthService.shared.handleOpenURL(url)
+						}
+					}
 				}
 		}
 	}
@@ -36,6 +43,7 @@ struct GeoRemindApp: App {
 struct RootView: View {
 	@Binding var hasCompletedOnboarding: Bool
 	@Environment(AuthService.self) private var auth
+	@Environment(AppSettings.self) private var settings
 
 	var body: some View {
 		Group {
@@ -48,5 +56,11 @@ struct RootView: View {
 			}
 		}
 		.dismissesKeyboardOnTap()
+		.preferredColorScheme(settings.appearance.colorScheme)
+		.onChange(of: auth.isAuthenticated) { _, signedIn in
+			if signedIn {
+				Task { await GroupStore.shared.redeemPendingInvite() }
+			}
+		}
 	}
 }

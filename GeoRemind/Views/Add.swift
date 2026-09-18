@@ -13,6 +13,7 @@ struct Add: View {
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(GroupStore.self) private var groups
 	@Environment(AuthService.self) private var auth
+	@Environment(AppSettings.self) private var settings
 	@Environment(\.dismiss) private var dismiss
 
 	@State private var title = ""
@@ -122,7 +123,7 @@ struct Add: View {
 				if selectedCoordinate != nil {
 					Section("Radius") {
 						VStack(alignment: .leading, spacing: 8) {
-							Text("\(Int(radius)) m")
+							Text(settings.formatDistance(radius))
 								.font(.subheadline.monospacedDigit())
 								.foregroundStyle(.secondary)
 							Slider(value: $radius, in: 50...2000, step: 50)
@@ -137,16 +138,25 @@ struct Add: View {
 						}
 						.pickerStyle(.segmented)
 					}
+				}
 
-					if auth.isAuthenticated, !groups.groups.isEmpty {
-						Section("Share with") {
-							Picker("Share with", selection: $selectedGroupId) {
-								Text("Only me").tag(Optional<UUID>.none)
-								ForEach(groups.groups) { group in
-									Text(group.name).tag(Optional(group.id))
-								}
+				if auth.isAuthenticated {
+					Section {
+						Picker("Group", selection: $selectedGroupId) {
+							Text("Personal").tag(Optional<UUID>.none)
+							ForEach(groups.groups) { group in
+								Text(group.name).tag(Optional(group.id))
 							}
 						}
+						.pickerStyle(.menu)
+					} header: {
+						Text("Visible to")
+					} footer: {
+						Text(
+							selectedGroupId == nil
+								? "Only you will see this reminder."
+								: "Everyone in the group can see this reminder on the map."
+						)
 					}
 				}
 			}
@@ -187,6 +197,11 @@ struct Add: View {
 			} message: {
 				Text(saveError ?? "")
 			}
+			.task {
+				if auth.isAuthenticated {
+					await groups.refresh()
+				}
+			}
 		}
 	}
 
@@ -225,4 +240,5 @@ struct Add: View {
 		.environment(ReminderStore.shared)
 		.environment(GroupStore.shared)
 		.environment(AuthService.shared)
+		.environment(AppSettings.shared)
 }
