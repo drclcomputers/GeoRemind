@@ -5,6 +5,7 @@
 //  Created by Dorneanu Denis on 18/09/2026.
 //
 
+import CoreLocation
 import Foundation
 import Observation
 import SwiftUI
@@ -54,6 +55,37 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 	}
 }
 
+struct SavedPlace: Codable, Equatable, Hashable {
+	var address: String
+	var latitude: Double
+	var longitude: Double
+
+	var coordinate: CLLocationCoordinate2D {
+		CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+	}
+}
+
+enum SavedPlaceKind: String, CaseIterable, Identifiable {
+	case home
+	case work
+
+	var id: String { rawValue }
+
+	var title: String {
+		switch self {
+		case .home: "Home"
+		case .work: "Work"
+		}
+	}
+
+	var symbol: String {
+		switch self {
+		case .home: "house.fill"
+		case .work: "briefcase.fill"
+		}
+	}
+}
+
 @Observable
 @MainActor
 final class AppSettings {
@@ -72,9 +104,19 @@ final class AppSettings {
 		}
 	}
 
+	var home: SavedPlace? {
+		didSet { savePlace(home, key: keys.home) }
+	}
+
+	var work: SavedPlace? {
+		didSet { savePlace(work, key: keys.work) }
+	}
+
 	private enum keys {
 		static let units = "settings.units"
 		static let appearance = "settings.appearance"
+		static let home = "settings.home"
+		static let work = "settings.work"
 	}
 
 	private init() {
@@ -87,6 +129,37 @@ final class AppSettings {
 				rawValue: UserDefaults.standard.string(forKey: keys.appearance)
 					?? ""
 			) ?? .system
+		home = Self.loadPlace(keys.home)
+		work = Self.loadPlace(keys.work)
+	}
+
+	func place(for kind: SavedPlaceKind) -> SavedPlace? {
+		switch kind {
+		case .home: home
+		case .work: work
+		}
+	}
+
+	func setPlace(_ place: SavedPlace?, for kind: SavedPlaceKind) {
+		switch kind {
+		case .home: home = place
+		case .work: work = place
+		}
+	}
+
+	private func savePlace(_ place: SavedPlace?, key: String) {
+		if let place, let data = try? JSONEncoder().encode(place) {
+			UserDefaults.standard.set(data, forKey: key)
+		} else {
+			UserDefaults.standard.removeObject(forKey: key)
+		}
+	}
+
+	private static func loadPlace(_ key: String) -> SavedPlace? {
+		guard let data = UserDefaults.standard.data(forKey: key) else {
+			return nil
+		}
+		return try? JSONDecoder().decode(SavedPlace.self, from: data)
 	}
 
 	func formatDistance(_ meters: Double) -> String {

@@ -15,12 +15,12 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	private let manager = CLLocationManager()
 
 	var authorizationStatus: CLAuthorizationStatus
+	var userCoordinate: CLLocationCoordinate2D?
 
 	var totalActiveCount: Int = 0
 	var isOverRegionLimit: Bool { totalActiveCount > regionLimit }
 
 	private let regionLimit = 20
-	private let candidateRadius: CLLocationDistance = 2400
 	private var lastLocation: CLLocationCoordinate2D?
 	private var cachedPins: [ReminderPin] = []
 
@@ -74,23 +74,24 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		guard authorizationStatus == .authorizedAlways else { return }
 
 		let candidates: [ReminderPin]
-		if let lastLocation {
+		if let here = lastLocation ?? userCoordinate {
 			let userLoc = CLLocation(
-				latitude: lastLocation.latitude,
-				longitude: lastLocation.longitude
+				latitude: here.latitude,
+				longitude: here.longitude
 			)
 			candidates =
 				activePins
-				.map { pin -> (ReminderPin, CLLocationDistance) in
-					let pinLoc = CLLocation(
-						latitude: pin.coordinate.latitude,
-						longitude: pin.coordinate.longitude
-					)
-					return (pin, pinLoc.distance(from: userLoc))
+				.sorted { a, b in
+					let da = CLLocation(
+						latitude: a.coordinate.latitude,
+						longitude: a.coordinate.longitude
+					).distance(from: userLoc)
+					let db = CLLocation(
+						latitude: b.coordinate.latitude,
+						longitude: b.coordinate.longitude
+					).distance(from: userLoc)
+					return da < db
 				}
-				.filter { $0.1 <= candidateRadius }
-				.sorted { $0.1 < $1.1 }
-				.map(\.0)
 		} else {
 			candidates = activePins
 		}
@@ -112,6 +113,38 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		}
 	}
 
+	func startDistanceUpdates() {
+		manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+		manager.requestLocation()
+		switch authorizationStatus {
+		case .authorizedAlways:
+			manager.startMonitoringSignificantLocationChanges()
+		case .authorizedWhenInUse:
+			manager.startUpdatingLocation()
+		default:
+			break
+		}
+	}
+
+	func stopDistanceUpdates() {
+		if authorizationStatus != .authorizedAlways {
+			manager.stopUpdatingLocation()
+		}
+	}
+
+	func distance(to pin: ReminderPin) -> CLLocationDistance? {
+		guard let here = userCoordinate ?? lastLocation else { return nil }
+		return CLLocation(
+			latitude: here.latitude,
+			longitude: here.longitude
+		).distance(
+			from: CLLocation(
+				latitude: pin.coordinate.latitude,
+				longitude: pin.coordinate.longitude
+			)
+		)
+	}
+
 	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
 		authorizationStatus = manager.authorizationStatus
 		if authorizationStatus == .authorizedAlways {
@@ -128,8 +161,18 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		didUpdateLocations locations: [CLLocation]
 	) {
 		guard let coordinate = locations.last?.coordinate else { return }
-		lastLocation = coordinate
-		syncRegions()
+		DispatchQueue.main.async { [weak self] in
+			self?.userCoordinate = coordinate
+			self?.lastLocation = coordinate
+			self?.syncRegions()
+		}
+	}
+
+	func locationManager(
+		_ manager: CLLocationManager,
+		didFailWithError error: Error
+	) {
+		print("Location update failed: \(error)")
 	}
 
 	func locationManager(

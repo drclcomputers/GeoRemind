@@ -50,14 +50,21 @@ final class AuthService {
 					.contains(event)
 				{
 					let wasSignedIn = self.session != nil
+					if session != nil, !wasSignedIn {
+						ReminderStore.shared.snapshotGuestPins()
+					}
 					self.session = session
 					self.isRestoringSession = false
 					if session != nil {
 						await loadProfile()
 						await reloadIdentities()
 						await fillAvatarFromOAuthIfNeeded()
-						if !wasSignedIn {
+						if !wasSignedIn
+							|| ReminderStore.shared.hasPendingGuestPins
+						{
 							await ReminderStore.shared.handleSignedIn()
+						}
+						if !wasSignedIn {
 							await GroupStore.shared.refresh()
 						}
 					} else {
@@ -76,6 +83,7 @@ final class AuthService {
 	func signUp(email: String, password: String, username: String) async {
 		errorMessage = nil
 		infoMessage = nil
+		captureGuestPinsIfNeeded()
 		do {
 			let response = try await supabase.auth.signUp(
 				email: email,
@@ -97,6 +105,7 @@ final class AuthService {
 	func signIn(email: String, password: String) async {
 		errorMessage = nil
 		infoMessage = nil
+		captureGuestPinsIfNeeded()
 		do {
 			self.session = try await supabase.auth.signIn(
 				email: email,
@@ -109,6 +118,7 @@ final class AuthService {
 
 	func signInWithApple(result: Result<ASAuthorization, Error>) async {
 		errorMessage = nil
+		captureGuestPinsIfNeeded()
 		do {
 			let authorization = try result.get()
 			guard
@@ -161,6 +171,7 @@ final class AuthService {
 	) async {
 		errorMessage = nil
 		infoMessage = nil
+		captureGuestPinsIfNeeded()
 		do {
 			self.session = try await supabase.auth.signInWithOAuth(
 				provider: provider,
@@ -516,6 +527,11 @@ final class AuthService {
 			return "Something went wrong. Please try again."
 		}
 		return text
+	}
+
+	private func captureGuestPinsIfNeeded() {
+		guard session == nil else { return }
+		ReminderStore.shared.snapshotGuestPins()
 	}
 
 	private func formattedName(_ name: PersonNameComponents?) -> String? {

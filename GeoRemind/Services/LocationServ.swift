@@ -23,6 +23,23 @@ func getCurrentLocation() async -> CLLocationCoordinate2D? {
 	return nil
 }
 
+func reverseAddress(for coordinate: CLLocationCoordinate2D) async -> String {
+	let location = CLLocation(
+		latitude: coordinate.latitude,
+		longitude: coordinate.longitude
+	)
+	guard
+		let mark = try? await CLGeocoder().reverseGeocodeLocation(location)
+			.first
+	else {
+		return ""
+	}
+	let parts = [mark.name, mark.locality].compactMap { $0 }.filter {
+		!$0.isEmpty
+	}
+	return parts.joined(separator: ", ")
+}
+
 func resolveCoordinate(for completion: MKLocalSearchCompletion) async
 	-> CLLocationCoordinate2D?
 {

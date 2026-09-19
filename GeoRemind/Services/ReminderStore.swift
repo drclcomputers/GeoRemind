@@ -20,22 +20,30 @@ final class ReminderStore {
 
 	@ObservationIgnored
 	private var realtimeTask: Task<Void, Never>?
+	@ObservationIgnored
+	private var pendingGuestPins: [ReminderPin] = []
 
 	private init() {
 		pins = PinCache.load()
 	}
 
 	func refresh() async {
+		await pullFromCloud(showLoading: true)
+		startRealtime()
+	}
+
+	private func pullFromCloud(showLoading: Bool) async {
 		guard AuthService.shared.isAuthenticated else {
 			pins = PinCache.load()
 			GeofenceManager.shared.syncRegions(pins: pins)
 			return
 		}
 
-		isLoading = true
-		defer { isLoading = false }
+		if showLoading { isLoading = true }
+		defer { if showLoading { isLoading = false } }
 		do {
-			let cloud: [ReminderPin] = try await supabase
+			let cloud: [ReminderPin] =
+				try await supabase
 				.from("reminders")
 				.select()
 				.order("created_at", ascending: false)
@@ -45,19 +53,77 @@ final class ReminderStore {
 			PinCache.save(cloud)
 			GeofenceManager.shared.syncRegions(pins: cloud)
 			errorMessage = nil
-			startRealtime()
 		} catch {
 			errorMessage = error.localizedDescription
 		}
 	}
 
 	func handleSignedIn() async {
-		clear()
+		await uploadLocalPinsToCloud()
 		await refresh()
 	}
 
 	func handleSignedOut() {
 		clear()
+	}
+
+	func snapshotGuestPins() {
+		var guest = pins
+		if guest.isEmpty {
+			guest = PinCache.loadPendingGuest()
+		}
+		if guest.isEmpty {
+			guest = PinCache.load()
+		}
+		pendingGuestPins = guest
+		if !guest.isEmpty {
+			PinCache.savePendingGuest(guest)
+		}
+	}
+
+	var hasPendingGuestPins: Bool {
+		!pendingGuestPins.isEmpty || !PinCache.loadPendingGuest().isEmpty
+	}
+
+	private func uploadLocalPinsToCloud() async {
+		guard let userId = AuthService.shared.userId else { return }
+		var guest = pendingGuestPins
+		if guest.isEmpty {
+			guest = PinCache.loadPendingGuest()
+		}
+		guard !guest.isEmpty else { return }
+
+		let writes = guest.map { pin in
+			ReminderInsert(
+				id: pin.id,
+				ownerId: userId,
+				groupId: nil,
+				title: pin.title,
+				description: pin.desc,
+				latitude: pin.latitude,
+				longitude: pin.longitude,
+				radius: pin.radius,
+				isActive: pin.isActive,
+				notifyOnEntry: pin.notifyOnEntry,
+				notifyOnExit: pin.notifyOnExit
+			)
+		}
+
+		do {
+			try await supabase.from("reminders").upsert(writes).execute()
+			pendingGuestPins = []
+			PinCache.clearPendingGuest()
+		} catch {
+			do {
+				for write in writes {
+					try await supabase.from("reminders").upsert(write).execute()
+				}
+				pendingGuestPins = []
+				PinCache.clearPendingGuest()
+			} catch {
+				errorMessage = error.localizedDescription
+			}
+		}
 	}
 
 	func add(
@@ -100,7 +166,8 @@ final class ReminderStore {
 				notifyOnEntry: pin.notifyOnEntry,
 				notifyOnExit: pin.notifyOnExit
 			)
-			let inserted: ReminderPin = try await supabase
+			let inserted: ReminderPin =
+				try await supabase
 				.from("reminders")
 				.insert(write)
 				.select()
@@ -138,7 +205,8 @@ final class ReminderStore {
 			groupId: pin.groupId
 		)
 
-		let updated: ReminderPin = try await supabase
+		let updated: ReminderPin =
+			try await supabase
 			.from("reminders")
 			.update(write)
 			.eq("id", value: pin.id)
@@ -188,7 +256,8 @@ final class ReminderStore {
 	}
 
 	func startRealtime() {
-		realtimeTask?.cancel()
+		guard AuthService.shared.isAuthenticated else { return }
+		guard realtimeTask == nil else { return }
 		realtimeTask = Task {
 			let channel = supabase.channel("reminders-sync")
 			let stream = channel.postgresChange(
@@ -199,13 +268,20 @@ final class ReminderStore {
 			await channel.subscribe()
 			for await _ in stream {
 				guard !Task.isCancelled else { break }
-				await refresh()
+				await pullFromCloud(showLoading: false)
 			}
+			await channel.unsubscribe()
+			realtimeTask = nil
 		}
 	}
 
 	private func persistAndSync() {
 		PinCache.save(pins)
+		if AuthService.shared.session == nil {
+			PinCache.savePendingGuest(
+				pins.filter { $0.ownerId == LocalIdentity.ownerId }
+			)
+		}
 		GeofenceManager.shared.syncRegions(pins: pins)
 	}
 }
@@ -221,7 +297,7 @@ enum StoreError: LocalizedError {
 }
 
 enum PinCache {
-	private static var fileURL: URL {
+	private static var folder: URL {
 		let folder = FileManager.default.urls(
 			for: .applicationSupportDirectory,
 			in: .userDomainMask
@@ -230,7 +306,15 @@ enum PinCache {
 			at: folder,
 			withIntermediateDirectories: true
 		)
-		return folder.appendingPathComponent("georemind-pins.json")
+		return folder
+	}
+
+	private static var fileURL: URL {
+		folder.appendingPathComponent("georemind-pins.json")
+	}
+
+	private static var pendingGuestURL: URL {
+		folder.appendingPathComponent("georemind-guest-pins.json")
 	}
 
 	static func load() -> [ReminderPin] {
@@ -242,6 +326,23 @@ enum PinCache {
 	static func save(_ pins: [ReminderPin]) {
 		guard let data = try? JSONCoders.encoder.encode(pins) else { return }
 		try? data.write(to: fileURL, options: [.atomic])
+	}
+
+	static func loadPendingGuest() -> [ReminderPin] {
+		guard let data = try? Data(contentsOf: pendingGuestURL) else {
+			return []
+		}
+		return (try? JSONCoders.decoder.decode([ReminderPin].self, from: data))
+			?? []
+	}
+
+	static func savePendingGuest(_ pins: [ReminderPin]) {
+		guard let data = try? JSONCoders.encoder.encode(pins) else { return }
+		try? data.write(to: pendingGuestURL, options: [.atomic])
+	}
+
+	static func clearPendingGuest() {
+		try? FileManager.default.removeItem(at: pendingGuestURL)
 	}
 }
 

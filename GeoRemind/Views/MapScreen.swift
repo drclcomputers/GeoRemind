@@ -18,7 +18,6 @@ struct MapScreen: View {
 	@State private var position: MapCameraPosition = .automatic
 	@State private var selectedPin: ReminderPin?
 	@State private var showingAuth = false
-	@State private var showingSettings = false
 
 	private var pins: [ReminderPin] { reminders.pins }
 
@@ -93,7 +92,6 @@ struct MapScreen: View {
 			permissionBanner
 		}
 		.navigationBarTitleDisplayMode(.inline)
-		.settingsAccess(isPresented: $showingSettings)
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				HStack(spacing: 6) {

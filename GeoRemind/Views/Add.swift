@@ -118,6 +118,9 @@ struct Add: View {
 							systemImage: "magnifyingglass"
 						)
 					}
+
+					savedPlaceButton(.home)
+					savedPlaceButton(.work)
 				}
 
 				if selectedCoordinate != nil {
@@ -232,6 +235,58 @@ struct Add: View {
 			}
 			isSaving = false
 		}
+	}
+
+	private func savedPlaceButton(_ kind: SavedPlaceKind) -> some View {
+		let saved = settings.place(for: kind)
+		return Button {
+			if let saved {
+				apply(saved, fallbackName: kind.title)
+			} else {
+				Task { await captureAndSave(kind) }
+			}
+		} label: {
+			Label(
+				saved == nil ? "Set \(kind.title)" : kind.title,
+				systemImage: kind.symbol
+			)
+		}
+		.disabled(isLocating)
+	}
+
+	private func apply(_ place: SavedPlace, fallbackName: String) {
+		selectedCoordinate = place.coordinate
+		selectedAddress =
+			place.address.isEmpty ? fallbackName : place.address
+	}
+
+	private func saveSelected(as kind: SavedPlaceKind) {
+		guard let coord = selectedCoordinate else { return }
+		let address =
+			selectedAddress.isEmpty ? kind.title : selectedAddress
+		settings.setPlace(
+			SavedPlace(
+				address: address,
+				latitude: coord.latitude,
+				longitude: coord.longitude
+			),
+			for: kind
+		)
+	}
+
+	private func captureAndSave(_ kind: SavedPlaceKind) async {
+		isLocating = true
+		GeofenceManager.shared.requestWhenInUseAuthorization()
+		defer { isLocating = false }
+		guard let coord = await getCurrentLocation() else { return }
+		let address = await reverseAddress(for: coord)
+		let place = SavedPlace(
+			address: address.isEmpty ? kind.title : address,
+			latitude: coord.latitude,
+			longitude: coord.longitude
+		)
+		settings.setPlace(place, for: kind)
+		apply(place, fallbackName: kind.title)
 	}
 }
 

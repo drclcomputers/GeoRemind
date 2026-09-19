@@ -7,6 +7,7 @@
 
 import Auth
 import AuthenticationServices
+import CoreLocation
 import SwiftUI
 
 struct SettingsSheet: View {
@@ -20,6 +21,10 @@ struct SettingsSheet: View {
 	@State private var showingSignOut = false
 	@State private var showingAuth = false
 	@State private var showingDelete = false
+	@State private var editingPlace: SavedPlaceKind?
+	@State private var showingPlaceSearch = false
+	@State private var placeSearchCoord: CLLocationCoordinate2D?
+	@State private var placeSearchAddress = ""
 
 	private var appVersion: String {
 		let info = Bundle.main.infoDictionary
@@ -58,6 +63,31 @@ struct SettingsSheet: View {
 					Text("Distance")
 				} footer: {
 					Text(settings.units.caption)
+				}
+
+				Section {
+					ForEach(SavedPlaceKind.allCases) { kind in
+						Button {
+							editingPlace = kind
+						} label: {
+							HStack {
+								Label(kind.title, systemImage: kind.symbol)
+								Spacer()
+								Text(
+									settings.place(for: kind)?.address
+										?? "Not set"
+								)
+								.foregroundStyle(.secondary)
+								.lineLimit(1)
+							}
+						}
+					}
+				} header: {
+					Text("Places")
+				} footer: {
+					Text(
+						"Used as one-tap locations when you add a reminder."
+					)
 				}
 
 				Section("Account") {
@@ -154,6 +184,60 @@ struct SettingsSheet: View {
 			.sheet(isPresented: $showingDelete) {
 				DeleteAccountSheet()
 			}
+			.sheet(isPresented: $showingPlaceSearch) {
+				SearchSheet(
+					selectedCoordinate: $placeSearchCoord,
+					selectedAddress: $placeSearchAddress
+				)
+			}
+			.onChange(of: showingPlaceSearch) { _, open in
+				if !open, let kind = editingPlace, let coord = placeSearchCoord
+				{
+					let address =
+						placeSearchAddress.isEmpty
+						? kind.title : placeSearchAddress
+					settings.setPlace(
+						SavedPlace(
+							address: address,
+							latitude: coord.latitude,
+							longitude: coord.longitude
+						),
+						for: kind
+					)
+					placeSearchCoord = nil
+					placeSearchAddress = ""
+					editingPlace = nil
+				}
+			}
+			.confirmationDialog(
+				editingPlace?.title ?? "Place",
+				isPresented: Binding(
+					get: { editingPlace != nil && !showingPlaceSearch },
+					set: { if !$0 { editingPlace = nil } }
+				),
+				titleVisibility: .visible
+			) {
+				Button("Use Current Location") {
+					let kind = editingPlace
+					Task { await setPlaceFromCurrent(kind) }
+				}
+				Button("Search") {
+					placeSearchCoord = nil
+					placeSearchAddress = ""
+					showingPlaceSearch = true
+				}
+				if let kind = editingPlace, settings.place(for: kind) != nil {
+					Button("Clear", role: .destructive) {
+						if let kind = editingPlace {
+							settings.setPlace(nil, for: kind)
+						}
+						editingPlace = nil
+					}
+				}
+				Button("Cancel", role: .cancel) {
+					editingPlace = nil
+				}
+			}
 			.confirmationDialog(
 				"Sign out?",
 				isPresented: $showingSignOut,
@@ -168,6 +252,25 @@ struct SettingsSheet: View {
 				Button("Cancel", role: .cancel) {}
 			}
 		}
+	}
+
+	private func setPlaceFromCurrent(_ kind: SavedPlaceKind?) async {
+		guard let kind else { return }
+		GeofenceManager.shared.requestWhenInUseAuthorization()
+		guard let coord = await getCurrentLocation() else {
+			editingPlace = nil
+			return
+		}
+		let address = await reverseAddress(for: coord)
+		settings.setPlace(
+			SavedPlace(
+				address: address.isEmpty ? kind.title : address,
+				latitude: coord.latitude,
+				longitude: coord.longitude
+			),
+			for: kind
+		)
+		editingPlace = nil
 	}
 
 	private func linkedRow(

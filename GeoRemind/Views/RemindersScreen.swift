@@ -1,3 +1,11 @@
+//
+//  RemindersScreen.swift
+//  GeoRemind
+//
+//  Created by Dorneanu Denis on 17/09/2026.
+//
+
+import CoreLocation
 import SwiftUI
 
 struct RemindersScreen: View {
@@ -8,9 +16,19 @@ struct RemindersScreen: View {
 	@Environment(AppSettings.self) private var settings
 
 	@State private var selectedPin: ReminderPin?
-	@State private var showingSettings = false
 
-	private var pins: [ReminderPin] { reminders.pins }
+	private var geofence: GeofenceManager { GeofenceManager.shared }
+
+	private var pins: [ReminderPin] {
+		reminders.pins.sorted { a, b in
+			switch (geofence.distance(to: a), geofence.distance(to: b)) {
+			case (let da?, let db?): da < db
+			case (_?, nil): true
+			case (nil, _?): false
+			case (nil, nil): a.timestamp > b.timestamp
+			}
+		}
+	}
 
 	var body: some View {
 		ZStack(alignment: .bottomTrailing) {
@@ -68,9 +86,24 @@ struct RemindersScreen: View {
 
 									Spacer()
 
-									Text(settings.formatDistance(pin.radius))
-										.font(.caption)
-										.foregroundStyle(.secondary)
+									VStack(alignment: .trailing, spacing: 2) {
+										if let meters = geofence.distance(
+											to: pin
+										) {
+											Text(
+												settings.formatDistance(meters)
+											)
+											.font(.caption.monospacedDigit())
+											.foregroundStyle(.secondary)
+											Text("away")
+												.font(.caption2)
+												.foregroundStyle(.tertiary)
+										} else {
+											Text("—")
+												.font(.caption)
+												.foregroundStyle(.tertiary)
+										}
+									}
 								}
 								.contentShape(Rectangle())
 							}
@@ -128,11 +161,12 @@ struct RemindersScreen: View {
 			.accessibilityLabel("Add Reminder")
 		}
 		.navigationTitle("GeoReminders")
-		.settingsAccess(isPresented: $showingSettings)
 		.sheet(item: $selectedPin) { pin in
 			PinDetailSheet(pinId: pin.id)
 		}
 		.task {
+			geofence.startDistanceUpdates()
+			defer { geofence.stopDistanceUpdates() }
 			await reminders.refresh()
 			while !Task.isCancelled {
 				try? await Task.sleep(for: .seconds(15))
