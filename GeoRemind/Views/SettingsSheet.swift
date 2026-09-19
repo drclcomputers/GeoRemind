@@ -33,6 +33,13 @@ struct SettingsSheet: View {
 		return "\(short) (\(build))"
 	}
 
+	private var currentLanguageName: String {
+		let id =
+			Locale.current.language.languageCode?.identifier
+			?? Locale.current.identifier
+		return Locale.current.localizedString(forLanguageCode: id) ?? id
+	}
+
 	var body: some View {
 		@Bindable var settings = settings
 		@Bindable var auth = auth
@@ -53,16 +60,24 @@ struct SettingsSheet: View {
 				}
 
 				Section {
-					Picker("Language", selection: $settings.language) {
-						ForEach(AppLanguage.allCases) { lang in
-							Text(lang.nativeName).tag(lang)
+					Button {
+						openAppSettings()
+					} label: {
+						HStack {
+							Text("Language")
+							Spacer()
+							Text(currentLanguageName)
+								.foregroundStyle(.secondary)
+							Image(systemName: "chevron.right")
+								.font(.caption.weight(.semibold))
+								.foregroundStyle(.tertiary)
 						}
 					}
 				} header: {
 					Text("Language")
 				} footer: {
 					Text(
-						"System uses the iPhone language. You can also change it in Settings → GeoRemind."
+						"Opens iPhone Settings, where you can change the language for GeoRemind."
 					)
 				}
 
@@ -187,7 +202,6 @@ struct SettingsSheet: View {
 			.navigationTitle("Settings")
 			.navigationBarTitleDisplayMode(.inline)
 			.appAppearance(settings.appearance)
-			.environment(\.locale, settings.resolvedLocale)
 			.toolbar {
 				ToolbarItem(placement: .confirmationAction) {
 					Button("Done") { dismiss() }
@@ -435,7 +449,6 @@ struct DeleteAccountSheet: View {
 			}
 			.navigationTitle("Delete Account")
 			.navigationBarTitleDisplayMode(.inline)
-			.environment(\.locale, settings.resolvedLocale)
 			.appAppearance(settings.appearance)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
@@ -482,14 +495,13 @@ extension View {
 
 private struct AppAppearanceModifier: ViewModifier {
 	var appearance: AppAppearance
-	@Environment(\.colorScheme) private var systemScheme
 
 	func body(content: Content) -> some View {
-		let scheme = appearance.colorScheme ?? systemScheme
 		content
-			.environment(\.colorScheme, scheme)
-			.preferredColorScheme(appearance.colorScheme)
-			.id(appearance)
+			.onAppear { AppSettings.applyWindowStyle(appearance) }
+			.onChange(of: appearance) { _, newValue in
+				AppSettings.applyWindowStyle(newValue)
+			}
 	}
 }
 

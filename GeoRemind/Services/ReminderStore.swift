@@ -236,7 +236,7 @@ final class ReminderStore {
 		pins.removeAll { $0.id == pin.id }
 		persistAndSync()
 		guard AuthService.shared.isAuthenticated else { return }
-		try? await supabase
+		_ = try? await supabase
 			.from("reminders")
 			.delete()
 			.eq("id", value: pin.id)
@@ -265,7 +265,7 @@ final class ReminderStore {
 				schema: "public",
 				table: "reminders"
 			)
-			await channel.subscribe()
+			_ = try? await channel.subscribeWithError()
 			for await _ in stream {
 				guard !Task.isCancelled else { break }
 				await pullFromCloud(showLoading: false)

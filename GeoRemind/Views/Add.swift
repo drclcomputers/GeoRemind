@@ -165,7 +165,6 @@ struct Add: View {
 			}
 			.scrollDismissesKeyboard(.interactively)
 			.dismissesKeyboardOnTap()
-			.environment(\.locale, settings.resolvedLocale)
 			.navigationTitle("New GeoReminder")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {

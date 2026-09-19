@@ -72,7 +72,7 @@ final class GroupStore {
 	func deleteGroup(_ group: GeoGroup) async {
 		groups.removeAll { $0.id == group.id }
 		membersByGroup[group.id] = nil
-		try? await supabase
+		_ = try? await supabase
 			.from("groups")
 			.delete()
 			.eq("id", value: group.id)
@@ -136,7 +136,7 @@ final class GroupStore {
 
 	func revokeInvite(_ invite: GroupInvite) async {
 		invitesByGroup[invite.groupId]?.removeAll { $0.id == invite.id }
-		try? await supabase
+		_ = try? await supabase
 			.from("group_invites")
 			.delete()
 			.eq("id", value: invite.id)
@@ -230,7 +230,7 @@ final class GroupStore {
 
 	func removeMember(_ member: GroupMember) async {
 		membersByGroup[member.groupId]?.removeAll { $0.userId == member.userId }
-		try? await supabase
+		_ = try? await supabase
 			.from("group_members")
 			.delete()
 			.eq("group_id", value: member.groupId)
@@ -242,7 +242,7 @@ final class GroupStore {
 	func leave(_ group: GeoGroup) async {
 		guard let userId = AuthService.shared.userId else { return }
 		groups.removeAll { $0.id == group.id }
-		try? await supabase
+		_ = try? await supabase
 			.from("group_members")
 			.delete()
 			.eq("group_id", value: group.id)

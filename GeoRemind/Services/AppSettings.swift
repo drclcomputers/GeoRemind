@@ -9,6 +9,7 @@ import CoreLocation
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 
 enum MeasureUnits: String, CaseIterable, Identifiable {
 	case metric
@@ -53,51 +54,12 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 		case .dark: .dark
 		}
 	}
-}
 
-enum AppLanguage: String, CaseIterable, Identifiable {
-	case system
-	case en
-	case ro
-	case fr
-	case de
-	case es
-	case it
-	case pt
-	case pl
-	case nl
-	case uk
-	case hu
-	case tr
-	case ja
-	case zhHans = "zh-Hans"
-
-	var id: String { rawValue }
-
-	var nativeName: String {
+	var interfaceStyle: UIUserInterfaceStyle {
 		switch self {
-		case .system: loc("System")
-		case .en: "English"
-		case .ro: "Română"
-		case .fr: "Français"
-		case .de: "Deutsch"
-		case .es: "Español"
-		case .it: "Italiano"
-		case .pt: "Português"
-		case .pl: "Polski"
-		case .nl: "Nederlands"
-		case .uk: "Українська"
-		case .hu: "Magyar"
-		case .tr: "Türkçe"
-		case .ja: "日本語"
-		case .zhHans: "简体中文"
-		}
-	}
-
-	var locale: Locale {
-		switch self {
-		case .system: Locale.autoupdatingCurrent
-		default: Locale(identifier: rawValue)
+		case .system: .unspecified
+		case .light: .light
+		case .dark: .dark
 		}
 	}
 }
@@ -155,6 +117,7 @@ final class AppSettings {
 				appearance.rawValue,
 				forKey: keys.appearance
 			)
+			Self.applyWindowStyle(appearance)
 		}
 	}
 
@@ -166,18 +129,9 @@ final class AppSettings {
 		didSet { savePlace(work, key: keys.work) }
 	}
 
-	var language: AppLanguage {
-		didSet {
-			UserDefaults.standard.set(language.rawValue, forKey: keys.language)
-		}
-	}
-
-	var resolvedLocale: Locale { language.locale }
-
 	private enum keys {
 		static let units = "settings.units"
 		static let appearance = "settings.appearance"
-		static let language = "settings.language"
 		static let home = "settings.home"
 		static let work = "settings.work"
 	}
@@ -194,11 +148,31 @@ final class AppSettings {
 			) ?? .system
 		home = Self.loadPlace(keys.home)
 		work = Self.loadPlace(keys.work)
-		language =
-			AppLanguage(
-				rawValue: UserDefaults.standard.string(forKey: keys.language)
-					?? ""
-			) ?? .system
+		UserDefaults.standard.removeObject(forKey: "settings.language")
+		Self.applyWindowStyle(appearance)
+	}
+
+	static func applyWindowStyle(_ appearance: AppAppearance) {
+		let style = appearance.interfaceStyle
+		for scene in UIApplication.shared.connectedScenes {
+			guard let windowScene = scene as? UIWindowScene else { continue }
+			for window in windowScene.windows {
+				window.overrideUserInterfaceStyle = style
+				applyStyle(style, to: window.rootViewController)
+			}
+		}
+	}
+
+	private static func applyStyle(
+		_ style: UIUserInterfaceStyle,
+		to controller: UIViewController?
+	) {
+		guard let controller else { return }
+		controller.overrideUserInterfaceStyle = style
+		for child in controller.children {
+			applyStyle(style, to: child)
+		}
+		applyStyle(style, to: controller.presentedViewController)
 	}
 
 	func place(for kind: SavedPlaceKind) -> SavedPlace? {
@@ -248,10 +222,5 @@ final class AppSettings {
 }
 
 func loc(_ value: String.LocalizationValue) -> String {
-	String(
-		localized: LocalizedStringResource(
-			value,
-			locale: AppSettings.shared.resolvedLocale
-		)
-	)
+	String(localized: value)
 }

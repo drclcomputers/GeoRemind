@@ -4,8 +4,6 @@
 <dict>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

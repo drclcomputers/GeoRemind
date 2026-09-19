@@ -121,32 +121,32 @@ struct MapScreen: View {
 			PermissionBanner(
 				icon: "location.slash",
 				message:
-					"Location access is off. Reminders can't be shown or triggered.",
-				actionTitle: "Open Settings",
+					loc("Location access is off. Reminders can't be shown or triggered."),
+				actionTitle: loc("Open Settings"),
 				action: openAppSettings
 			)
 		} else if NotificationStatusMonitor.shared.status == .denied {
 			PermissionBanner(
 				icon: "bell.slash",
 				message:
-					"Notifications are off. You won't be alerted when you arrive.",
-				actionTitle: "Open Settings",
+					loc("Notifications are off. You won't be alerted when you arrive."),
+				actionTitle: loc("Open Settings"),
 				action: openAppSettings
 			)
 		} else if locationStatus == .authorizedWhenInUse {
 			PermissionBanner(
 				icon: "location.slash",
 				message:
-					"Allow \"Always\" location to get reminders in the background.",
-				actionTitle: "Enable",
+					loc("Allow \"Always\" location to get reminders in the background."),
+				actionTitle: loc("Enable"),
 				action: { GeofenceManager.shared.requestAlwaysAuthorization() }
 			)
 		} else if !auth.isAuthenticated {
 			PermissionBanner(
 				icon: "iphone",
 				message:
-					"Reminders stay on this iPhone. Sign in to sync and use groups.",
-				actionTitle: "Sign In",
+					loc("Reminders stay on this iPhone. Sign in to sync and use groups."),
+				actionTitle: loc("Sign In"),
 				action: { showingAuth = true }
 			)
 		}

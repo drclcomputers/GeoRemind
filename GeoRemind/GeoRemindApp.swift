@@ -57,7 +57,6 @@ struct RootView: View {
 		}
 		.dismissesKeyboardOnTap()
 		.preferredColorScheme(settings.appearance.colorScheme)
-		.environment(\.locale, settings.resolvedLocale)
 		.onChange(of: auth.isAuthenticated) { _, signedIn in
 			if signedIn {
 				Task { await GroupStore.shared.redeemPendingInvite() }

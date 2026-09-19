@@ -196,7 +196,6 @@ struct PinDetailSheet: View {
 						}
 					}
 				}
-				.environment(\.locale, settings.resolvedLocale)
 				.scrollDismissesKeyboard(.interactively)
 				.dismissesKeyboardOnTap()
 				.navigationTitle(pin.title.isEmpty ? "Reminder" : pin.title)

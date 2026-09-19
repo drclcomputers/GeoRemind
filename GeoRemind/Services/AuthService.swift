@@ -142,7 +142,7 @@ final class AuthService {
 			)
 
 			if let fullName = formattedName(credential.fullName) {
-				try? await supabase.auth.update(
+				_ = try? await supabase.auth.update(
 					user: UserAttributes(data: ["full_name": .string(fullName)])
 				)
 			}
@@ -197,7 +197,7 @@ final class AuthService {
 			let callback = try await launchFlow(oauthURL)
 			_ = try await supabase.auth.session(from: callback)
 			rememberLinked(provider.rawValue)
-			try? await supabase.auth.refreshSession()
+			_ = try? await supabase.auth.refreshSession()
 			self.session = try await supabase.auth.session
 			await reloadIdentities()
 			rememberLinked(provider.rawValue)
@@ -259,7 +259,7 @@ final class AuthService {
 
 	private func finishDeletion() async throws {
 		if let userId {
-			try? await supabase.storage.from("avatars").remove(paths: [
+			_ = try? await supabase.storage.from("avatars").remove(paths: [
 				"\(userId.uuidString.lowercased())/avatar.jpg"
 			])
 		}

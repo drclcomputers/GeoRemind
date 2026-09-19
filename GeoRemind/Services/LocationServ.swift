@@ -28,16 +28,15 @@ func reverseAddress(for coordinate: CLLocationCoordinate2D) async -> String {
 		latitude: coordinate.latitude,
 		longitude: coordinate.longitude
 	)
-	guard
-		let mark = try? await CLGeocoder().reverseGeocodeLocation(location)
-			.first
+	guard let request = MKReverseGeocodingRequest(location: location),
+		let item = try? await request.mapItems.first
 	else {
 		return ""
 	}
-	let parts = [mark.name, mark.locality].compactMap { $0 }.filter {
-		!$0.isEmpty
+	if let short = item.address?.shortAddress, !short.isEmpty {
+		return short
 	}
-	return parts.joined(separator: ", ")
+	return item.name ?? ""
 }
 
 func resolveCoordinate(for completion: MKLocalSearchCompletion) async

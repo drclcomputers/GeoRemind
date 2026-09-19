@@ -232,7 +232,6 @@ struct AuthView: View {
 			}
 			.scrollDismissesKeyboard(.interactively)
 			.scrollIndicators(.hidden)
-			.environment(\.locale, AppSettings.shared.resolvedLocale)
 			.navigationTitle("Sign In")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
@@ -303,11 +302,11 @@ private struct PasswordChecklist: View {
 	var body: some View {
 		let rules = PasswordRules.check(password)
 		VStack(alignment: .leading, spacing: 6) {
-			ruleRow("At least 8 characters", ok: rules.length)
-			ruleRow("One uppercase letter", ok: rules.upper)
-			ruleRow("One lowercase letter", ok: rules.lower)
-			ruleRow("One number", ok: rules.digit)
-			ruleRow("One symbol (!@#$…)", ok: rules.symbol)
+			ruleRow(loc("At least 8 characters"), ok: rules.length)
+			ruleRow(loc("One uppercase letter"), ok: rules.upper)
+			ruleRow(loc("One lowercase letter"), ok: rules.lower)
+			ruleRow(loc("One number"), ok: rules.digit)
+			ruleRow(loc("One symbol (!@#$…)"), ok: rules.symbol)
 		}
 		.font(.footnote)
 		.frame(maxWidth: .infinity, alignment: .leading)

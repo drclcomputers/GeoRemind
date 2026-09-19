@@ -7,19 +7,24 @@
 
 import Foundation
 
-struct UserProfile: Identifiable, Codable, Equatable, Hashable {
+nonisolated struct UserProfile: Identifiable, Codable, Equatable, Hashable,
+	Sendable
+{
 	var id: UUID
 	var username: String
 	var avatarUrl: String?
 	var createdAt: Date?
 }
 
-struct GeoGroup: Identifiable, Codable, Equatable, Hashable {
+nonisolated struct GeoGroup: Identifiable, Codable, Equatable, Hashable,
+	Sendable
+{
 	var id: UUID
 	var name: String
 	var ownerId: UUID
 	var createdAt: Date?
 
+	@MainActor
 	var isOwnedByCurrentUser: Bool {
 		ownerId == AuthService.shared.userId
 	}
@@ -30,7 +35,7 @@ struct GeoGroup: Identifiable, Codable, Equatable, Hashable {
 	}
 }
 
-struct GroupMember: Identifiable, Equatable, Hashable {
+nonisolated struct GroupMember: Identifiable, Equatable, Hashable, Sendable {
 	var groupId: UUID
 	var userId: UUID
 	var role: String
@@ -42,14 +47,14 @@ struct GroupMember: Identifiable, Equatable, Hashable {
 	var isOwner: Bool { role == "owner" }
 }
 
-struct GroupMemberRow: Decodable {
+nonisolated struct GroupMemberRow: Decodable, Sendable {
 	var groupId: UUID
 	var userId: UUID
 	var role: String
 	var joinedAt: Date?
 	var profiles: MemberProfileEmbed?
 
-	struct MemberProfileEmbed: Decodable {
+	nonisolated struct MemberProfileEmbed: Decodable, Sendable {
 		var username: String?
 		var avatarUrl: String?
 	}
@@ -66,18 +71,20 @@ struct GroupMemberRow: Decodable {
 	}
 }
 
-struct GroupInsert: Encodable {
+nonisolated struct GroupInsert: Encodable, Sendable {
 	var name: String
 	var ownerId: UUID
 }
 
-struct GroupMemberInsert: Encodable {
+nonisolated struct GroupMemberInsert: Encodable, Sendable {
 	var groupId: UUID
 	var userId: UUID
 	var role: String
 }
 
-struct GroupInvite: Identifiable, Codable, Equatable, Hashable {
+nonisolated struct GroupInvite: Identifiable, Codable, Equatable, Hashable,
+	Sendable
+{
 	var id: UUID
 	var groupId: UUID
 	var code: String
@@ -97,13 +104,13 @@ struct GroupInvite: Identifiable, Codable, Equatable, Hashable {
 	}
 }
 
-struct GroupInviteInsert: Encodable {
+nonisolated struct GroupInviteInsert: Encodable, Sendable {
 	var groupId: UUID
 	var code: String
 	var createdBy: UUID
 	var expiresAt: Date
 }
 
-struct JoinGroupParams: Encodable {
+nonisolated struct JoinGroupParams: Encodable, Sendable {
 	var invite_code: String
 }

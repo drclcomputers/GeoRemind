@@ -9,7 +9,9 @@ import CoreLocation
 import Foundation
 import SwiftUI
 
-struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
+nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
+	Sendable
+{
 	var id: UUID
 	var ownerId: UUID
 	var groupId: UUID?
@@ -70,6 +72,7 @@ struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
 		CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
 	}
 
+	@MainActor
 	var isOwnedByCurrentUser: Bool {
 		if let userId = AuthService.shared.userId {
 			return ownerId == userId
@@ -87,7 +90,7 @@ struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
 	}
 }
 
-struct ReminderInsert: Encodable {
+nonisolated struct ReminderInsert: Encodable, Sendable {
 	var id: UUID
 	var ownerId: UUID
 	var groupId: UUID?
@@ -101,7 +104,7 @@ struct ReminderInsert: Encodable {
 	var notifyOnExit: Bool
 }
 
-struct ReminderUpdate: Encodable {
+nonisolated struct ReminderUpdate: Encodable, Sendable {
 	var title: String
 	var description: String
 	var radius: Double
@@ -111,7 +114,7 @@ struct ReminderUpdate: Encodable {
 	var groupId: UUID?
 }
 
-enum NotifyMode: String, CaseIterable, Identifiable {
+nonisolated enum NotifyMode: String, CaseIterable, Identifiable, Sendable {
 	case arrival = "Arrival"
 	case departure = "Departure"
 	case both = "Both"
