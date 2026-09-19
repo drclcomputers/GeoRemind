@@ -157,7 +157,7 @@ final class GroupStore {
 
 		guard AuthService.shared.isAuthenticated else {
 			UserDefaults.standard.set(normalized, forKey: Self.pendingInviteKey)
-			infoMessage = "Sign in to join the group."
+			infoMessage = loc("Sign in to join the group.")
 			return
 		}
 
@@ -173,7 +173,7 @@ final class GroupStore {
 			UserDefaults.standard.removeObject(forKey: Self.pendingInviteKey)
 			await refresh()
 			await loadMembers(for: groupId)
-			infoMessage = "You joined the group."
+			infoMessage = loc("You joined the group.")
 		} catch {
 			errorMessage = friendlyJoinError(error)
 		}
@@ -213,11 +213,17 @@ final class GroupStore {
 
 	private func friendlyJoinError(_ error: Error) -> String {
 		let text = error.localizedDescription.lowercased()
-		if text.contains("invalid") { return "That invite code isn't valid." }
-		if text.contains("expired") { return "That invite has expired." }
-		if text.contains("used") { return "That invite can't be used anymore." }
+		if text.contains("invalid") {
+			return loc("That invite code isn't valid.")
+		}
+		if text.contains("expired") {
+			return loc("That invite has expired.")
+		}
+		if text.contains("used") {
+			return loc("That invite can't be used anymore.")
+		}
 		if text.contains("authenticated") {
-			return "Sign in to join the group."
+			return loc("Sign in to join the group.")
 		}
 		return error.localizedDescription
 	}

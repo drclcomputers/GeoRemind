@@ -119,9 +119,11 @@ struct OnboardingView: View {
 		}
 	}
 
-	private func permissionRow(icon: String, title: String, detail: String)
-		-> some View
-	{
+	private func permissionRow(
+		icon: String,
+		title: LocalizedStringKey,
+		detail: LocalizedStringKey
+	) -> some View {
 		HStack(alignment: .top, spacing: 14) {
 			Image(systemName: icon)
 				.font(.system(size: 20))

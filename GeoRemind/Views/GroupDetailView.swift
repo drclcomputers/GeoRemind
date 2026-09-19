@@ -145,6 +145,7 @@ struct GroupDetailView: View {
 			}
 			.navigationTitle(group.name)
 			.navigationBarTitleDisplayMode(.inline)
+			.environment(\.locale, AppSettings.shared.resolvedLocale)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
 					Button("Done") { dismiss() }

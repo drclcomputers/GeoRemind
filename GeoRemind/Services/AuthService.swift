@@ -465,66 +465,73 @@ final class AuthService {
 		if lower.contains("invalid login")
 			|| lower.contains("invalid credentials")
 		{
-			return "Wrong email or password."
+			return loc("Wrong email or password.")
 		}
 		if lower.contains("already registered")
 			|| lower.contains("already exists")
 		{
-			return "An account with this email already exists. Try signing in."
+			return loc(
+				"An account with this email already exists. Try signing in."
+			)
 		}
 		if lower.contains("email not confirmed")
 			|| lower.contains("not confirmed")
 		{
-			return "Confirm your email first — check your inbox."
+			return loc("Confirm your email first — check your inbox.")
 		}
 		if lower.contains("password")
 			&& (lower.contains("weak") || lower.contains("at least")
 				|| lower.contains("pwned") || lower.contains("leaked")
 				|| lower.contains("characters") || lower.contains("strength"))
 		{
-			return
+			return loc(
 				"Password is too weak. Use 8+ characters with upper, lower, a number and a symbol."
+			)
 		}
 		if lower.contains("unable to validate email")
 			|| lower.contains("invalid email")
 		{
-			return "That email address doesn't look valid."
+			return loc("That email address doesn't look valid.")
 		}
 		if lower.contains("direct deletion") || lower.contains("storage api") {
-			return "Couldn't delete the account photo. Try again."
+			return loc("Couldn't delete the account photo. Try again.")
 		}
 		if lower.contains("bucket") || lower.contains("not found")
 			|| lower.contains("object") && lower.contains("404")
 		{
-			return
+			return loc(
 				"Photo storage isn't set up. Create a public avatars bucket in Supabase."
+			)
 		}
 		if lower.contains("duplicate") || lower.contains("unique") {
-			return "That username is taken."
+			return loc("That username is taken.")
 		}
 		if lower.contains("manual linking")
 			|| lower.contains("linking is disabled")
 		{
-			return
+			return loc(
 				"Manual linking is off. Enable it under Authentication → Sign In / Providers."
+			)
 		}
 		if lower.contains("identity") && lower.contains("already") {
-			return
+			return loc(
 				"That Google or Facebook account is already linked to another user."
+			)
 		}
 		if lower.contains("localhost") || lower.contains("redirect") {
-			return
+			return loc(
 				"Couldn't finish sign in. Add georemind://auth-callback in Supabase Redirect URLs."
+			)
 		}
 		if lower.contains("webauthentication")
 			|| lower.contains("authenticationservices")
 			|| lower.contains("com.apple.")
 		{
-			return "Sign in was interrupted. Please try again."
+			return loc("Sign in was interrupted. Please try again.")
 		}
 		if text.count > 120 || (lower.contains("error ") && lower.contains("("))
 		{
-			return "Something went wrong. Please try again."
+			return loc("Something went wrong. Please try again.")
 		}
 		return text
 	}

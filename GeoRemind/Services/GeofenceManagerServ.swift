@@ -222,12 +222,15 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 			content.title = pin.title
 			content.body =
 				pin.desc.isEmpty
-				? "Hey! You're in the proximity of this GeoReminder's location!"
+				? loc(
+					"Hey! You're in the proximity of this GeoReminder's location!"
+				)
 				: pin.desc
 		case .departure:
-			content.title = "Don't forget!"
-			content.body =
+			content.title = loc("Don't forget!")
+			content.body = loc(
 				"Hey! Don't forget about your GeoReminder at \"\(pin.title)\"!"
+			)
 		}
 
 		content.sound = .default

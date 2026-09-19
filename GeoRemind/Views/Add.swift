@@ -136,7 +136,7 @@ struct Add: View {
 					Section("Notify me on") {
 						Picker("Notify me on", selection: $notifyMode) {
 							ForEach(NotifyMode.allCases) { mode in
-								Text(mode.rawValue).tag(mode)
+								Text(mode.title).tag(mode)
 							}
 						}
 						.pickerStyle(.segmented)
@@ -165,6 +165,7 @@ struct Add: View {
 			}
 			.scrollDismissesKeyboard(.interactively)
 			.dismissesKeyboardOnTap()
+			.environment(\.locale, settings.resolvedLocale)
 			.navigationTitle("New GeoReminder")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
@@ -241,15 +242,23 @@ struct Add: View {
 		let saved = settings.place(for: kind)
 		return Button {
 			if let saved {
-				apply(saved, fallbackName: kind.title)
+				apply(
+					saved,
+					fallbackName: kind == .home ? loc("Home") : loc("Work")
+				)
 			} else {
 				Task { await captureAndSave(kind) }
 			}
 		} label: {
-			Label(
-				saved == nil ? "Set \(kind.title)" : kind.title,
-				systemImage: kind.symbol
-			)
+			Label {
+				if saved == nil {
+					Text(kind == .home ? "Set Home" : "Set Work")
+				} else {
+					Text(kind.title)
+				}
+			} icon: {
+				Image(systemName: kind.symbol)
+			}
 		}
 		.disabled(isLocating)
 	}
@@ -263,7 +272,7 @@ struct Add: View {
 	private func saveSelected(as kind: SavedPlaceKind) {
 		guard let coord = selectedCoordinate else { return }
 		let address =
-			selectedAddress.isEmpty ? kind.title : selectedAddress
+			selectedAddress.isEmpty ? kind.titleString : selectedAddress
 		settings.setPlace(
 			SavedPlace(
 				address: address,
@@ -280,13 +289,14 @@ struct Add: View {
 		defer { isLocating = false }
 		guard let coord = await getCurrentLocation() else { return }
 		let address = await reverseAddress(for: coord)
+		let fallback = kind == .home ? loc("Home") : loc("Work")
 		let place = SavedPlace(
-			address: address.isEmpty ? kind.title : address,
+			address: address.isEmpty ? fallback : address,
 			latitude: coord.latitude,
 			longitude: coord.longitude
 		)
 		settings.setPlace(place, for: kind)
-		apply(place, fallbackName: kind.title)
+		apply(place, fallbackName: fallback)
 	}
 }
 

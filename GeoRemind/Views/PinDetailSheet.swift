@@ -117,10 +117,9 @@ struct PinDetailSheet: View {
 								)
 							)
 						} else {
-							LabeledContent(
-								"Active",
-								value: pin.isActive ? "Yes" : "No"
-							)
+							LabeledContent("Active") {
+								Text(pin.isActive ? "Yes" : "No")
+							}
 						}
 					}
 
@@ -151,15 +150,14 @@ struct PinDetailSheet: View {
 								selection: $editedNotifyMode
 							) {
 								ForEach(NotifyMode.allCases) { mode in
-									Text(mode.rawValue).tag(mode)
+									Text(mode.title).tag(mode)
 								}
 							}
 							.pickerStyle(.segmented)
 						} else {
-							LabeledContent(
-								"Notify me on",
-								value: pin.notifyMode.rawValue
-							)
+							LabeledContent("Notify me on") {
+								Text(pin.notifyMode.title)
+							}
 						}
 					}
 
@@ -198,6 +196,7 @@ struct PinDetailSheet: View {
 						}
 					}
 				}
+				.environment(\.locale, settings.resolvedLocale)
 				.scrollDismissesKeyboard(.interactively)
 				.dismissesKeyboardOnTap()
 				.navigationTitle(pin.title.isEmpty ? "Reminder" : pin.title)

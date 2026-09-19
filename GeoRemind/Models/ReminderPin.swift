@@ -7,6 +7,7 @@
 
 import CoreLocation
 import Foundation
+import SwiftUI
 
 struct ReminderPin: Identifiable, Codable, Equatable, Hashable {
 	var id: UUID
@@ -116,6 +117,14 @@ enum NotifyMode: String, CaseIterable, Identifiable {
 	case both = "Both"
 
 	var id: String { rawValue }
+
+	var title: LocalizedStringKey {
+		switch self {
+		case .arrival: "Arrival"
+		case .departure: "Departure"
+		case .both: "Both"
+		}
+	}
 
 	var flags: (entry: Bool, exit: Bool) {
 		switch self {

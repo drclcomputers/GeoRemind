@@ -232,6 +232,7 @@ struct AuthView: View {
 			}
 			.scrollDismissesKeyboard(.interactively)
 			.scrollIndicators(.hidden)
+			.environment(\.locale, AppSettings.shared.resolvedLocale)
 			.navigationTitle("Sign In")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {

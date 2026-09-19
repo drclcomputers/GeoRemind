@@ -291,7 +291,7 @@ enum StoreError: LocalizedError {
 
 	var errorDescription: String? {
 		switch self {
-		case .notSignedIn: return "You need to be signed in."
+		case .notSignedIn: return loc("You need to be signed in.")
 		}
 	}
 }

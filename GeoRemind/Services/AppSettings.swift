@@ -16,14 +16,14 @@ enum MeasureUnits: String, CaseIterable, Identifiable {
 
 	var id: String { rawValue }
 
-	var title: String {
+	var title: LocalizedStringKey {
 		switch self {
 		case .metric: "Metric"
 		case .imperial: "Imperial"
 		}
 	}
 
-	var caption: String {
+	var caption: LocalizedStringKey {
 		switch self {
 		case .metric: "Meters, kilometers"
 		case .imperial: "Feet, miles"
@@ -38,7 +38,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
 	var id: String { rawValue }
 
-	var title: String {
+	var title: LocalizedStringKey {
 		switch self {
 		case .system: "System"
 		case .light: "Light"
@@ -51,6 +51,53 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 		case .system: nil
 		case .light: .light
 		case .dark: .dark
+		}
+	}
+}
+
+enum AppLanguage: String, CaseIterable, Identifiable {
+	case system
+	case en
+	case ro
+	case fr
+	case de
+	case es
+	case it
+	case pt
+	case pl
+	case nl
+	case uk
+	case hu
+	case tr
+	case ja
+	case zhHans = "zh-Hans"
+
+	var id: String { rawValue }
+
+	var nativeName: String {
+		switch self {
+		case .system: loc("System")
+		case .en: "English"
+		case .ro: "Română"
+		case .fr: "Français"
+		case .de: "Deutsch"
+		case .es: "Español"
+		case .it: "Italiano"
+		case .pt: "Português"
+		case .pl: "Polski"
+		case .nl: "Nederlands"
+		case .uk: "Українська"
+		case .hu: "Magyar"
+		case .tr: "Türkçe"
+		case .ja: "日本語"
+		case .zhHans: "简体中文"
+		}
+	}
+
+	var locale: Locale {
+		switch self {
+		case .system: Locale.autoupdatingCurrent
+		default: Locale(identifier: rawValue)
 		}
 	}
 }
@@ -71,10 +118,17 @@ enum SavedPlaceKind: String, CaseIterable, Identifiable {
 
 	var id: String { rawValue }
 
-	var title: String {
+	var title: LocalizedStringKey {
 		switch self {
 		case .home: "Home"
 		case .work: "Work"
+		}
+	}
+
+	var titleString: String {
+		switch self {
+		case .home: loc("Home")
+		case .work: loc("Work")
 		}
 	}
 
@@ -112,9 +166,18 @@ final class AppSettings {
 		didSet { savePlace(work, key: keys.work) }
 	}
 
+	var language: AppLanguage {
+		didSet {
+			UserDefaults.standard.set(language.rawValue, forKey: keys.language)
+		}
+	}
+
+	var resolvedLocale: Locale { language.locale }
+
 	private enum keys {
 		static let units = "settings.units"
 		static let appearance = "settings.appearance"
+		static let language = "settings.language"
 		static let home = "settings.home"
 		static let work = "settings.work"
 	}
@@ -131,6 +194,11 @@ final class AppSettings {
 			) ?? .system
 		home = Self.loadPlace(keys.home)
 		work = Self.loadPlace(keys.work)
+		language =
+			AppLanguage(
+				rawValue: UserDefaults.standard.string(forKey: keys.language)
+					?? ""
+			) ?? .system
 	}
 
 	func place(for kind: SavedPlaceKind) -> SavedPlace? {
@@ -177,4 +245,13 @@ final class AppSettings {
 			return "\(Int(feet.rounded())) ft"
 		}
 	}
+}
+
+func loc(_ value: String.LocalizationValue) -> String {
+	String(
+		localized: LocalizedStringResource(
+			value,
+			locale: AppSettings.shared.resolvedLocale
+		)
+	)
 }

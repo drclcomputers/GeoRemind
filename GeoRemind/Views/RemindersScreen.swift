@@ -37,7 +37,10 @@ struct RemindersScreen: View {
 					PermissionBanner(
 						icon: "exclamationmark.triangle",
 						message:
-							"Only 20 active reminders can be monitored in the background. You have \(GeofenceManager.shared.totalActiveCount) active."
+							String(
+								localized:
+									"Only 20 active reminders can be monitored in the background. You have \(GeofenceManager.shared.totalActiveCount) active."
+							),
 					)
 				}
 				if pins.isEmpty {
@@ -91,13 +94,10 @@ struct RemindersScreen: View {
 											to: pin
 										) {
 											Text(
-												settings.formatDistance(meters)
+												"\(settings.formatDistance(meters)) away"
 											)
 											.font(.caption.monospacedDigit())
 											.foregroundStyle(.secondary)
-											Text("away")
-												.font(.caption2)
-												.foregroundStyle(.tertiary)
 										} else {
 											Text("—")
 												.font(.caption)

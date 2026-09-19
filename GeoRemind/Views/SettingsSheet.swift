@@ -53,6 +53,20 @@ struct SettingsSheet: View {
 				}
 
 				Section {
+					Picker("Language", selection: $settings.language) {
+						ForEach(AppLanguage.allCases) { lang in
+							Text(lang.nativeName).tag(lang)
+						}
+					}
+				} header: {
+					Text("Language")
+				} footer: {
+					Text(
+						"System uses the iPhone language. You can also change it in Settings → GeoRemind."
+					)
+				}
+
+				Section {
 					Picker("Units", selection: $settings.units) {
 						ForEach(MeasureUnits.allCases) { unit in
 							Text(unit.title).tag(unit)
@@ -172,7 +186,8 @@ struct SettingsSheet: View {
 			}
 			.navigationTitle("Settings")
 			.navigationBarTitleDisplayMode(.inline)
-			.preferredColorScheme(settings.appearance.colorScheme)
+			.appAppearance(settings.appearance)
+			.environment(\.locale, settings.resolvedLocale)
 			.toolbar {
 				ToolbarItem(placement: .confirmationAction) {
 					Button("Done") { dismiss() }
@@ -195,7 +210,7 @@ struct SettingsSheet: View {
 				{
 					let address =
 						placeSearchAddress.isEmpty
-						? kind.title : placeSearchAddress
+						? kind.titleString : placeSearchAddress
 					settings.setPlace(
 						SavedPlace(
 							address: address,
@@ -264,7 +279,7 @@ struct SettingsSheet: View {
 		let address = await reverseAddress(for: coord)
 		settings.setPlace(
 			SavedPlace(
-				address: address.isEmpty ? kind.title : address,
+				address: address.isEmpty ? kind.titleString : address,
 				latitude: coord.latitude,
 				longitude: coord.longitude
 			),
@@ -352,7 +367,7 @@ struct DeleteAccountSheet: View {
 						.keyboardType(.emailAddress)
 						.autocorrectionDisabled()
 				} footer: {
-					Text("Type \(auth.email ?? "your email") to confirm.")
+					Text("Type \(auth.email ?? loc("your email")) to confirm.")
 				}
 
 				Section {
@@ -420,7 +435,8 @@ struct DeleteAccountSheet: View {
 			}
 			.navigationTitle("Delete Account")
 			.navigationBarTitleDisplayMode(.inline)
-			.preferredColorScheme(settings.appearance.colorScheme)
+			.environment(\.locale, settings.resolvedLocale)
+			.appAppearance(settings.appearance)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
 					Button("Cancel") { dismiss() }
@@ -461,5 +477,24 @@ extension View {
 		.sheet(isPresented: isPresented) {
 			SettingsSheet()
 		}
+	}
+}
+
+private struct AppAppearanceModifier: ViewModifier {
+	var appearance: AppAppearance
+	@Environment(\.colorScheme) private var systemScheme
+
+	func body(content: Content) -> some View {
+		let scheme = appearance.colorScheme ?? systemScheme
+		content
+			.environment(\.colorScheme, scheme)
+			.preferredColorScheme(appearance.colorScheme)
+			.id(appearance)
+	}
+}
+
+extension View {
+	func appAppearance(_ appearance: AppAppearance) -> some View {
+		modifier(AppAppearanceModifier(appearance: appearance))
 	}
 }
