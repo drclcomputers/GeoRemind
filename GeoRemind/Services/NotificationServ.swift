@@ -5,9 +5,9 @@
 //  Created by Dorneanu Denis on 15/09/2026.
 //
 
-import UserNotifications
 import Observation
 import UIKit
+import UserNotifications
 
 class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
 	static let shared = NotificationDelegate()
@@ -20,24 +20,45 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
 	) {
 		completionHandler([.banner, .sound, .badge])
 	}
+
+	func userNotificationCenter(
+		_ center: UNUserNotificationCenter,
+		didReceive response: UNNotificationResponse,
+		withCompletionHandler completionHandler: @escaping () -> Void
+	) {
+		let info = response.notification.request.content.userInfo
+		if let raw = info["pinId"] as? String, let pinId = UUID(uuidString: raw)
+		{
+			let event = info["event"] as? String ?? "arrival"
+			GeofenceManager.shared.handleNotificationAction(
+				response.actionIdentifier,
+				pinId: pinId,
+				eventRaw: event
+			)
+		}
+		completionHandler()
+	}
 }
 
 @Observable
 final class NotificationStatusMonitor {
 	static let shared = NotificationStatusMonitor()
- 
+
 	var status: UNAuthorizationStatus = .notDetermined
- 
+
 	private init() {}
- 
+
 	func refresh() async {
-		let settings = await UNUserNotificationCenter.current().notificationSettings()
+		let settings = await UNUserNotificationCenter.current()
+			.notificationSettings()
 		status = settings.authorizationStatus
 	}
 }
 
 func openAppSettings() {
-	guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+	guard let url = URL(string: UIApplication.openSettingsURLString) else {
+		return
+	}
 	UIApplication.shared.open(url)
 }
 

@@ -23,6 +23,7 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	private let regionLimit = 20
 	private var lastLocation: CLLocationCoordinate2D?
 	private var cachedPins: [ReminderPin] = []
+	private var mute = GeofenceMute.load()
 
 	private override init() {
 		authorizationStatus = CLLocationManager().authorizationStatus
@@ -205,7 +206,7 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		}
 	}
 
-	private enum GeofenceEvent {
+	enum GeofenceEvent {
 		case arrival
 		case departure
 	}
@@ -219,9 +220,28 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 			guard pin.notifyOnExit else { return }
 		}
 		guard pin.shouldFire() else { return }
+		if mute.blocks(pin.id, event: event) { return }
 		sendNotification(for: pin, event: event)
+		mute.didFire(pin.id)
 		if !pin.repeats {
 			Task { await ReminderStore.shared.setActive(pin, isActive: false) }
+		}
+	}
+
+	func handleNotificationAction(
+		_ action: String,
+		pinId: UUID,
+		eventRaw: String
+	) {
+		let event: GeofenceEvent =
+			eventRaw == "departure" ? .departure : .arrival
+		switch action {
+		case GeofenceNotify.skip:
+			mute.skip(pinId, event: event)
+		case GeofenceNotify.snooze:
+			mute.snooze(pinId, for: 60 * 60)
+		default:
+			return
 		}
 	}
 
@@ -245,6 +265,11 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		}
 
 		content.sound = .default
+		content.categoryIdentifier = pin.repeats ? GeofenceNotify.category : ""
+		content.userInfo = [
+			"pinId": pin.id.uuidString,
+			"event": event == .arrival ? "arrival" : "departure",
+		]
 
 		let identifierPrefix = event == .arrival ? "arrival" : "departure"
 		let request = UNNotificationRequest(
@@ -254,5 +279,101 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 			trigger: nil
 		)
 		UNUserNotificationCenter.current().add(request)
+	}
+}
+
+enum GeofenceNotify {
+	static let category = "georemind.geofence"
+	static let skip = "georemind.skip"
+	static let snooze = "georemind.snooze"
+
+	static func register() {
+		let skip = UNNotificationAction(
+			identifier: Self.skip,
+			title: loc("Skip"),
+			options: []
+		)
+		let snooze = UNNotificationAction(
+			identifier: Self.snooze,
+			title: loc("Snooze 1h"),
+			options: []
+		)
+		let category = UNNotificationCategory(
+			identifier: Self.category,
+			actions: [skip, snooze],
+			intentIdentifiers: [],
+			options: []
+		)
+		UNUserNotificationCenter.current().setNotificationCategories([category])
+	}
+}
+
+private struct GeofenceMute: Codable {
+	var snoozeUntil: [String: Date] = [:]
+	var skipUntilExit: [String] = []
+	var skipUntilEnter: [String] = []
+	var cooldownUntil: [String: Date] = [:]
+
+	private static let key = "georemind.geofenceMute"
+
+	static func load() -> GeofenceMute {
+		guard let data = UserDefaults.standard.data(forKey: key),
+			let value = try? JSONDecoder().decode(GeofenceMute.self, from: data)
+		else {
+			return GeofenceMute()
+		}
+		return value
+	}
+
+	func save() {
+		guard let data = try? JSONEncoder().encode(self) else { return }
+		UserDefaults.standard.set(data, forKey: Self.key)
+	}
+
+	mutating func didFire(_ pinId: UUID) {
+		cooldownUntil[pinId.uuidString] = Date().addingTimeInterval(120)
+		save()
+	}
+
+	mutating func skip(_ pinId: UUID, event: GeofenceManager.GeofenceEvent) {
+		let key = pinId.uuidString
+		switch event {
+		case .arrival:
+			if !skipUntilExit.contains(key) { skipUntilExit.append(key) }
+		case .departure:
+			if !skipUntilEnter.contains(key) { skipUntilEnter.append(key) }
+		}
+		save()
+	}
+
+	mutating func snooze(_ pinId: UUID, for seconds: TimeInterval) {
+		snoozeUntil[pinId.uuidString] = Date().addingTimeInterval(seconds)
+		save()
+	}
+
+	mutating func blocks(
+		_ pinId: UUID,
+		event: GeofenceManager.GeofenceEvent
+	) -> Bool {
+		let key = pinId.uuidString
+		let now = Date()
+		if let until = snoozeUntil[key] {
+			if until > now { return true }
+			snoozeUntil[key] = nil
+		}
+		if let until = cooldownUntil[key] {
+			if until > now { return true }
+			cooldownUntil[key] = nil
+		}
+		switch event {
+		case .arrival:
+			if skipUntilExit.contains(key) { return true }
+			skipUntilEnter.removeAll { $0 == key }
+		case .departure:
+			if skipUntilEnter.contains(key) { return true }
+			skipUntilExit.removeAll { $0 == key }
+		}
+		save()
+		return false
 	}
 }

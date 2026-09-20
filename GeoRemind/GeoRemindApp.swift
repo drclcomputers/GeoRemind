@@ -16,6 +16,7 @@ struct GeoRemindApp: App {
 	init() {
 		UNUserNotificationCenter.current().delegate =
 			NotificationDelegate.shared
+		GeofenceNotify.register()
 		GeofenceManager.shared.preload()
 		NetworkMonitor.shared.start()
 		AuthService.shared.start()

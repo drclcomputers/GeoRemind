@@ -221,7 +221,7 @@ final class AppSettings {
 	}
 }
 
-func loc(_ value: String.LocalizationValue) -> String {
+nonisolated func loc(_ value: String.LocalizationValue) -> String {
 	String(localized: value)
 }
 

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum WeekdayMask {
+nonisolated enum WeekdayMask {
 	static let all = 0b1111111
 
 	static func contains(_ mask: Int, isoDay: Int) -> Bool {
@@ -47,7 +47,7 @@ enum WeekdayMask {
 	}
 }
 
-enum DayMinutes {
+nonisolated enum DayMinutes {
 	static func matches(from: Int?, to: Int?, date: Date = .now) -> Bool {
 		guard let from, let to else { return true }
 		let parts = Calendar.current.dateComponents(
