@@ -179,18 +179,14 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 		_ manager: CLLocationManager,
 		didEnterRegion region: CLRegion
 	) {
-		guard let pin = activePin(for: region), pin.notifyOnEntry else {
-			return
-		}
-		sendNotification(for: pin, event: .arrival)
+		handle(region, event: .arrival)
 	}
 
 	func locationManager(
 		_ manager: CLLocationManager,
 		didExitRegion region: CLRegion
 	) {
-		guard let pin = activePin(for: region), pin.notifyOnExit else { return }
-		sendNotification(for: pin, event: .departure)
+		handle(region, event: .departure)
 	}
 
 	func locationManager(
@@ -212,6 +208,21 @@ final class GeofenceManager: NSObject, CLLocationManagerDelegate {
 	private enum GeofenceEvent {
 		case arrival
 		case departure
+	}
+
+	private func handle(_ region: CLRegion, event: GeofenceEvent) {
+		guard let pin = activePin(for: region) else { return }
+		switch event {
+		case .arrival:
+			guard pin.notifyOnEntry else { return }
+		case .departure:
+			guard pin.notifyOnExit else { return }
+		}
+		guard pin.shouldFire() else { return }
+		sendNotification(for: pin, event: event)
+		if !pin.repeats {
+			Task { await ReminderStore.shared.setActive(pin, isActive: false) }
+		}
 	}
 
 	private func sendNotification(for pin: ReminderPin, event: GeofenceEvent) {

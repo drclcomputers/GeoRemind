@@ -113,19 +113,7 @@ final class ReminderStore {
 		guard !guest.isEmpty else { return }
 
 		let writes = guest.map { pin in
-			ReminderInsert(
-				id: pin.id,
-				ownerId: userId,
-				groupId: nil,
-				title: pin.title,
-				description: pin.desc,
-				latitude: pin.latitude,
-				longitude: pin.longitude,
-				radius: pin.radius,
-				isActive: pin.isActive,
-				notifyOnEntry: pin.notifyOnEntry,
-				notifyOnExit: pin.notifyOnExit
-			)
+			pin.asInsert(ownerId: userId)
 		}
 
 		do {
@@ -154,6 +142,10 @@ final class ReminderStore {
 		notifyOnEntry: Bool,
 		notifyOnExit: Bool,
 		groupId: UUID?,
+		repeats: Bool = true,
+		weekdays: Int = WeekdayMask.all,
+		activeFromMinutes: Int? = nil,
+		activeToMinutes: Int? = nil,
 		existingId: UUID? = nil
 	) async throws {
 		let ownerId = AuthService.shared.userId ?? LocalIdentity.ownerId
@@ -168,7 +160,11 @@ final class ReminderStore {
 			radius: radius,
 			isActive: true,
 			notifyOnEntry: notifyOnEntry,
-			notifyOnExit: notifyOnExit
+			notifyOnExit: notifyOnExit,
+			repeats: repeats,
+			weekdays: weekdays,
+			activeFromMinutes: activeFromMinutes,
+			activeToMinutes: activeToMinutes
 		)
 
 		if let index = pins.firstIndex(where: { $0.id == pin.id }) {
@@ -186,19 +182,7 @@ final class ReminderStore {
 		}
 
 		do {
-			let write = ReminderInsert(
-				id: pin.id,
-				ownerId: ownerId,
-				groupId: pin.groupId,
-				title: pin.title,
-				description: pin.desc,
-				latitude: pin.latitude,
-				longitude: pin.longitude,
-				radius: pin.radius,
-				isActive: true,
-				notifyOnEntry: pin.notifyOnEntry,
-				notifyOnExit: pin.notifyOnExit
-			)
+			let write = pin.asInsert()
 			let inserted: ReminderPin =
 				try await supabase
 				.from("reminders")
@@ -238,7 +222,11 @@ final class ReminderStore {
 			isActive: pin.isActive,
 			notifyOnEntry: pin.notifyOnEntry,
 			notifyOnExit: pin.notifyOnExit,
-			groupId: pin.groupId
+			groupId: pin.groupId,
+			repeats: pin.repeats,
+			weekdays: pin.weekdays,
+			activeFromMinutes: pin.activeFromMinutes,
+			activeToMinutes: pin.activeToMinutes
 		)
 
 		do {
@@ -355,19 +343,7 @@ final class ReminderStore {
 			}
 		}
 		for pin in pending.upserts where !pending.deleted.contains(pin.id) {
-			let write = ReminderInsert(
-				id: pin.id,
-				ownerId: pin.ownerId,
-				groupId: pin.groupId,
-				title: pin.title,
-				description: pin.desc,
-				latitude: pin.latitude,
-				longitude: pin.longitude,
-				radius: pin.radius,
-				isActive: pin.isActive,
-				notifyOnEntry: pin.notifyOnEntry,
-				notifyOnExit: pin.notifyOnExit
-			)
+			let write = pin.asInsert()
 			do {
 				_ = try await supabase.from("reminders").upsert(write).execute()
 			} catch {

@@ -23,6 +23,11 @@ struct PinDetailSheet: View {
 	@State private var editedRadius: Double = 200
 	@State private var editedNotifyMode: NotifyMode = .arrival
 	@State private var editedGroupId: UUID?
+	@State private var editedRepeats = true
+	@State private var editedWeekdays = WeekdayMask.all
+	@State private var editedRestrictHours = false
+	@State private var editedFromMinutes = 9 * 60
+	@State private var editedToMinutes = 17 * 60
 	@State private var showingDeleteConfirm = false
 	@State private var saveError: String?
 
@@ -161,6 +166,38 @@ struct PinDetailSheet: View {
 						}
 					}
 
+					if isEditing {
+						RepeatScheduleEditor(
+							repeats: $editedRepeats,
+							weekdays: $editedWeekdays,
+							restrictHours: $editedRestrictHours,
+							fromMinutes: $editedFromMinutes,
+							toMinutes: $editedToMinutes
+						)
+					} else {
+						Section("When") {
+							LabeledContent("Repeat") {
+								Text(pin.repeats ? "Every time" : "Once")
+							}
+							LabeledContent("Days") {
+								Text(WeekdayMask.summary(pin.weekdays))
+							}
+							if let from = pin.activeFromMinutes,
+								let to = pin.activeToMinutes
+							{
+								LabeledContent("Hours") {
+									Text(
+										"\(DayMinutes.label(from))–\(DayMinutes.label(to))"
+									)
+								}
+							} else {
+								LabeledContent("Hours") {
+									Text("Any time")
+								}
+							}
+						}
+					}
+
 					if canEdit, auth.isAuthenticated {
 						Section {
 							if isEditing {
@@ -221,6 +258,15 @@ struct PinDetailSheet: View {
 									editedRadius = pin.radius
 									editedNotifyMode = pin.notifyMode
 									editedGroupId = pin.groupId
+									editedRepeats = pin.repeats
+									editedWeekdays = pin.weekdays
+									editedRestrictHours =
+										pin.activeFromMinutes != nil
+										&& pin.activeToMinutes != nil
+									editedFromMinutes =
+										pin.activeFromMinutes ?? 9 * 60
+									editedToMinutes =
+										pin.activeToMinutes ?? 17 * 60
 									isEditing = true
 								}
 							}
@@ -279,6 +325,11 @@ struct PinDetailSheet: View {
 		next.notifyOnEntry = flags.entry
 		next.notifyOnExit = flags.exit
 		next.groupId = editedGroupId
+		next.repeats = editedRepeats
+		next.weekdays = editedWeekdays
+		next.activeFromMinutes =
+			editedRestrictHours ? editedFromMinutes : nil
+		next.activeToMinutes = editedRestrictHours ? editedToMinutes : nil
 		Task {
 			do {
 				try await reminders.update(next)

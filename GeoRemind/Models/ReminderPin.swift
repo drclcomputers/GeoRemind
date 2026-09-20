@@ -24,6 +24,10 @@ nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
 	var timestamp: Date
 	var notifyOnEntry: Bool
 	var notifyOnExit: Bool
+	var repeats: Bool
+	var weekdays: Int
+	var activeFromMinutes: Int?
+	var activeToMinutes: Int?
 
 	enum CodingKeys: String, CodingKey {
 		case id
@@ -38,6 +42,10 @@ nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
 		case timestamp = "createdAt"
 		case notifyOnEntry
 		case notifyOnExit
+		case repeats
+		case weekdays
+		case activeFromMinutes
+		case activeToMinutes
 	}
 
 	init(
@@ -52,7 +60,11 @@ nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
 		isActive: Bool = true,
 		timestamp: Date = .now,
 		notifyOnEntry: Bool = true,
-		notifyOnExit: Bool = false
+		notifyOnExit: Bool = false,
+		repeats: Bool = true,
+		weekdays: Int = WeekdayMask.all,
+		activeFromMinutes: Int? = nil,
+		activeToMinutes: Int? = nil
 	) {
 		self.id = id
 		self.ownerId = ownerId
@@ -66,6 +78,39 @@ nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
 		self.timestamp = timestamp
 		self.notifyOnEntry = notifyOnEntry
 		self.notifyOnExit = notifyOnExit
+		self.repeats = repeats
+		self.weekdays = weekdays
+		self.activeFromMinutes = activeFromMinutes
+		self.activeToMinutes = activeToMinutes
+	}
+
+	init(from decoder: Decoder) throws {
+		let c = try decoder.container(keyedBy: CodingKeys.self)
+		id = try c.decode(UUID.self, forKey: .id)
+		ownerId = try c.decode(UUID.self, forKey: .ownerId)
+		groupId = try c.decodeIfPresent(UUID.self, forKey: .groupId)
+		title = try c.decode(String.self, forKey: .title)
+		desc = try c.decodeIfPresent(String.self, forKey: .desc) ?? ""
+		latitude = try c.decode(Double.self, forKey: .latitude)
+		longitude = try c.decode(Double.self, forKey: .longitude)
+		radius = try c.decode(Double.self, forKey: .radius)
+		isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+		timestamp = try c.decodeIfPresent(Date.self, forKey: .timestamp) ?? .now
+		notifyOnEntry =
+			try c.decodeIfPresent(Bool.self, forKey: .notifyOnEntry) ?? true
+		notifyOnExit =
+			try c.decodeIfPresent(Bool.self, forKey: .notifyOnExit) ?? false
+		repeats = try c.decodeIfPresent(Bool.self, forKey: .repeats) ?? true
+		weekdays =
+			try c.decodeIfPresent(Int.self, forKey: .weekdays) ?? WeekdayMask.all
+		activeFromMinutes = try c.decodeIfPresent(
+			Int.self,
+			forKey: .activeFromMinutes
+		)
+		activeToMinutes = try c.decodeIfPresent(
+			Int.self,
+			forKey: .activeToMinutes
+		)
 	}
 
 	var coordinate: CLLocationCoordinate2D {
@@ -88,6 +133,45 @@ nonisolated struct ReminderPin: Identifiable, Codable, Equatable, Hashable,
 	var notifyMode: NotifyMode {
 		NotifyMode.from(entry: notifyOnEntry, exit: notifyOnExit)
 	}
+
+	func shouldFire(at date: Date = .now) -> Bool {
+		guard isActive else { return false }
+		guard WeekdayMask.contains(weekdays, date: date) else { return false }
+		return DayMinutes.matches(
+			from: activeFromMinutes,
+			to: activeToMinutes,
+			date: date
+		)
+	}
+
+	var scheduleSummary: String {
+		var parts = [repeats ? loc("Every time") : loc("Once")]
+		parts.append(WeekdayMask.summary(weekdays))
+		if let from = activeFromMinutes, let to = activeToMinutes {
+			parts.append("\(DayMinutes.label(from))–\(DayMinutes.label(to))")
+		}
+		return parts.joined(separator: " · ")
+	}
+
+	func asInsert(ownerId: UUID? = nil) -> ReminderInsert {
+		ReminderInsert(
+			id: id,
+			ownerId: ownerId ?? self.ownerId,
+			groupId: groupId,
+			title: title,
+			description: desc,
+			latitude: latitude,
+			longitude: longitude,
+			radius: radius,
+			isActive: isActive,
+			notifyOnEntry: notifyOnEntry,
+			notifyOnExit: notifyOnExit,
+			repeats: repeats,
+			weekdays: weekdays,
+			activeFromMinutes: activeFromMinutes,
+			activeToMinutes: activeToMinutes
+		)
+	}
 }
 
 nonisolated struct ReminderInsert: Encodable, Sendable {
@@ -102,6 +186,10 @@ nonisolated struct ReminderInsert: Encodable, Sendable {
 	var isActive: Bool
 	var notifyOnEntry: Bool
 	var notifyOnExit: Bool
+	var repeats: Bool
+	var weekdays: Int
+	var activeFromMinutes: Int?
+	var activeToMinutes: Int?
 }
 
 nonisolated struct ReminderUpdate: Encodable, Sendable {
@@ -112,6 +200,10 @@ nonisolated struct ReminderUpdate: Encodable, Sendable {
 	var notifyOnEntry: Bool
 	var notifyOnExit: Bool
 	var groupId: UUID?
+	var repeats: Bool
+	var weekdays: Int
+	var activeFromMinutes: Int?
+	var activeToMinutes: Int?
 }
 
 nonisolated enum NotifyMode: String, CaseIterable, Identifiable, Sendable {

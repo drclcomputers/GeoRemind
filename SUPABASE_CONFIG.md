@@ -63,6 +63,10 @@
 `  is_active boolean not null default true,`
 `  notify_on_entry boolean not null default true,`
 `  notify_on_exit boolean not null default false,`
+`  repeats boolean not null default true,`
+`  weekdays smallint not null default 127,`
+`  active_from_minutes integer,`
+`  active_to_minutes integer,`
 `  created_at timestamptz not null default now()`
 `);`
 
@@ -492,3 +496,19 @@ Skip Apple unless you have a paid Apple Developer account.
 
 
 If sign-in opens Safari instead of the in-app sheet, the URL scheme isn't registered or Redirect URLs doesn't include georemind://auth-callback. If avatars fail, the bucket isn't public or the policy on storage.objects didn't run.
+
+## Recurring reminders (existing projects)
+
+Run this in the SQL Editor if `reminders` already exists:
+
+```sql
+alter table public.reminders
+  add column if not exists repeats boolean not null default true,
+  add column if not exists weekdays smallint not null default 127,
+  add column if not exists active_from_minutes integer,
+  add column if not exists active_to_minutes integer;
+```
+
+`weekdays` is a bitmask (Mon = 1, Tue = 2, … Sun = 64). `127` = every day.
+`active_from_minutes` / `active_to_minutes` are minutes from midnight in the phone's local time. Null = any hour.
+

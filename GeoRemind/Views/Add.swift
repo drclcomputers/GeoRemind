@@ -23,6 +23,11 @@ struct Add: View {
 	@State private var selectedCoordinate: CLLocationCoordinate2D?
 	@State private var selectedAddress: String = ""
 	@State private var selectedGroupId: UUID?
+	@State private var repeats = true
+	@State private var weekdays = WeekdayMask.all
+	@State private var restrictHours = false
+	@State private var fromMinutes = 9 * 60
+	@State private var toMinutes = 17 * 60
 	@State private var showingSearch = false
 	@State private var showingValidationAlert = false
 	@State private var isLocating = false
@@ -141,6 +146,14 @@ struct Add: View {
 						}
 						.pickerStyle(.segmented)
 					}
+
+					RepeatScheduleEditor(
+						repeats: $repeats,
+						weekdays: $weekdays,
+						restrictHours: $restrictHours,
+						fromMinutes: $fromMinutes,
+						toMinutes: $toMinutes
+					)
 				}
 
 				if auth.isAuthenticated {
@@ -226,7 +239,11 @@ struct Add: View {
 					radius: radius,
 					notifyOnEntry: flags.entry,
 					notifyOnExit: flags.exit,
-					groupId: selectedGroupId
+					groupId: selectedGroupId,
+					repeats: repeats,
+					weekdays: weekdays,
+					activeFromMinutes: restrictHours ? fromMinutes : nil,
+					activeToMinutes: restrictHours ? toMinutes : nil
 				)
 				sendPinAddedNotification(title: title)
 				dismiss()
