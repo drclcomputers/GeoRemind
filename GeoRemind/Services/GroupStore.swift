@@ -50,7 +50,9 @@ final class GroupStore {
 				.value
 			errorMessage = nil
 		} catch {
-			errorMessage = error.localizedDescription
+			if !isIgnorableNetworkError(error) {
+				errorMessage = error.localizedDescription
+			}
 		}
 	}
 
@@ -72,7 +74,8 @@ final class GroupStore {
 	func deleteGroup(_ group: GeoGroup) async {
 		groups.removeAll { $0.id == group.id }
 		membersByGroup[group.id] = nil
-		_ = try? await supabase
+		_ =
+			try? await supabase
 			.from("groups")
 			.delete()
 			.eq("id", value: group.id)
@@ -92,7 +95,9 @@ final class GroupStore {
 				.value
 			membersByGroup[groupId] = rows.map { $0.asMember() }
 		} catch {
-			errorMessage = error.localizedDescription
+			if !isIgnorableNetworkError(error) {
+				errorMessage = error.localizedDescription
+			}
 		}
 	}
 
@@ -130,13 +135,16 @@ final class GroupStore {
 				.value
 			invitesByGroup[groupId] = rows
 		} catch {
-			errorMessage = error.localizedDescription
+			if !isIgnorableNetworkError(error) {
+				errorMessage = error.localizedDescription
+			}
 		}
 	}
 
 	func revokeInvite(_ invite: GroupInvite) async {
 		invitesByGroup[invite.groupId]?.removeAll { $0.id == invite.id }
-		_ = try? await supabase
+		_ =
+			try? await supabase
 			.from("group_invites")
 			.delete()
 			.eq("id", value: invite.id)
@@ -175,6 +183,7 @@ final class GroupStore {
 			await loadMembers(for: groupId)
 			infoMessage = loc("You joined the group.")
 		} catch {
+			if error is CancellationError { return }
 			errorMessage = friendlyJoinError(error)
 		}
 	}
@@ -212,6 +221,9 @@ final class GroupStore {
 	}
 
 	private func friendlyJoinError(_ error: Error) -> String {
+		if isIgnorableNetworkError(error) {
+			return loc("You need a connection to join a group.")
+		}
 		let text = error.localizedDescription.lowercased()
 		if text.contains("invalid") {
 			return loc("That invite code isn't valid.")
@@ -230,7 +242,8 @@ final class GroupStore {
 
 	func removeMember(_ member: GroupMember) async {
 		membersByGroup[member.groupId]?.removeAll { $0.userId == member.userId }
-		_ = try? await supabase
+		_ =
+			try? await supabase
 			.from("group_members")
 			.delete()
 			.eq("group_id", value: member.groupId)
@@ -242,7 +255,8 @@ final class GroupStore {
 	func leave(_ group: GeoGroup) async {
 		guard let userId = AuthService.shared.userId else { return }
 		groups.removeAll { $0.id == group.id }
-		_ = try? await supabase
+		_ =
+			try? await supabase
 			.from("group_members")
 			.delete()
 			.eq("group_id", value: group.id)

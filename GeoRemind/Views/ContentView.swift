@@ -49,4 +49,5 @@ struct Home: View {
 		.environment(AuthService.shared)
 		.environment(ReminderStore.shared)
 		.environment(GroupStore.shared)
+		.environment(NetworkMonitor.shared)
 }

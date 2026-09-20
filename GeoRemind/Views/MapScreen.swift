@@ -14,6 +14,7 @@ struct MapScreen: View {
 	@Environment(\.scenePhase) private var scenePhase
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(AuthService.self) private var auth
+	@Environment(NetworkMonitor.self) private var network
 
 	@State private var position: MapCameraPosition = .automatic
 	@State private var selectedPin: ReminderPin?
@@ -117,11 +118,20 @@ struct MapScreen: View {
 	private var permissionBanner: some View {
 		let locationStatus = GeofenceManager.shared.authorizationStatus
 
-		if locationStatus == .denied || locationStatus == .restricted {
+		if !network.isOnline {
+			PermissionBanner(
+				icon: "wifi.slash",
+				message: loc(
+					"You're offline. Reminders stay on this iPhone."
+				)
+			)
+		} else if locationStatus == .denied || locationStatus == .restricted {
 			PermissionBanner(
 				icon: "location.slash",
 				message:
-					loc("Location access is off. Reminders can't be shown or triggered."),
+					loc(
+						"Location access is off. Reminders can't be shown or triggered."
+					),
 				actionTitle: loc("Open Settings"),
 				action: openAppSettings
 			)
@@ -129,7 +139,9 @@ struct MapScreen: View {
 			PermissionBanner(
 				icon: "bell.slash",
 				message:
-					loc("Notifications are off. You won't be alerted when you arrive."),
+					loc(
+						"Notifications are off. You won't be alerted when you arrive."
+					),
 				actionTitle: loc("Open Settings"),
 				action: openAppSettings
 			)
@@ -137,15 +149,19 @@ struct MapScreen: View {
 			PermissionBanner(
 				icon: "location.slash",
 				message:
-					loc("Allow \"Always\" location to get reminders in the background."),
+					loc(
+						"Allow \"Always\" location to get reminders in the background."
+					),
 				actionTitle: loc("Enable"),
 				action: { GeofenceManager.shared.requestAlwaysAuthorization() }
 			)
-		} else if !auth.isAuthenticated {
+		} else if !auth.hasAccount {
 			PermissionBanner(
 				icon: "iphone",
 				message:
-					loc("Reminders stay on this iPhone. Sign in to sync and use groups."),
+					loc(
+						"Reminders stay on this iPhone. Sign in to sync and use groups."
+					),
 				actionTitle: loc("Sign In"),
 				action: { showingAuth = true }
 			)

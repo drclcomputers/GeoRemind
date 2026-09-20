@@ -120,12 +120,18 @@ struct SettingsSheet: View {
 				}
 
 				Section("Account") {
-					if auth.isAuthenticated {
-						if let name = auth.profile?.username {
+					if auth.hasAccount {
+						if let name = auth.profile?.username
+							?? auth.cachedAccount?.username
+						{
 							LabeledContent("Signed in as", value: name)
 						}
 						if let email = auth.email {
 							LabeledContent("Email", value: email)
+						}
+						if auth.isOfflineAccount {
+							Text("You're offline.")
+								.foregroundStyle(.secondary)
 						}
 						Button("Sign Out", role: .destructive) {
 							showingSignOut = true

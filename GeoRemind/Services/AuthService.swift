@@ -23,12 +23,15 @@ final class AuthService {
 	var errorMessage: String?
 	var infoMessage: String?
 	var linkedProviders: [String] = []
+	var cachedAccount: CachedAccount?
 
 	var isAuthenticated: Bool { session != nil }
+	var hasAccount: Bool { session != nil || cachedAccount != nil }
+	var isOfflineAccount: Bool { session == nil && cachedAccount != nil }
 
-	var userId: UUID? { session?.user.id }
+	var userId: UUID? { session?.user.id ?? cachedAccount?.userId }
 
-	var email: String? { session?.user.email }
+	var email: String? { session?.user.email ?? cachedAccount?.email }
 
 	func hasProvider(_ provider: String) -> Bool {
 		linkedProviders.contains(provider)
@@ -38,8 +41,12 @@ final class AuthService {
 
 	@ObservationIgnored
 	private var authTask: Task<Void, Never>?
+	@ObservationIgnored
+	private var userInitiatedSignOut = false
 
-	private init() {}
+	private init() {
+		cachedAccount = CachedAccount.load()
+	}
 
 	func start() {
 		guard authTask == nil else { return }
@@ -56,6 +63,7 @@ final class AuthService {
 					self.session = session
 					self.isRestoringSession = false
 					if session != nil {
+						rememberAccount(from: session!)
 						await loadProfile()
 						await reloadIdentities()
 						await fillAvatarFromOAuthIfNeeded()
@@ -67,13 +75,18 @@ final class AuthService {
 						if !wasSignedIn {
 							await GroupStore.shared.refresh()
 						}
-					} else {
+					} else if userInitiatedSignOut || cachedAccount == nil {
+						clearCachedAccount()
 						self.profile = nil
 						self.linkedProviders = []
-						if wasSignedIn {
+						if wasSignedIn || userInitiatedSignOut {
 							ReminderStore.shared.handleSignedOut()
 						}
 						GroupStore.shared.clear()
+						userInitiatedSignOut = false
+					} else {
+						self.profile = nil
+						self.linkedProviders = []
 					}
 				}
 			}
@@ -264,11 +277,15 @@ final class AuthService {
 			])
 		}
 		try await supabase.rpc("delete_own_account").execute()
+		userInitiatedSignOut = true
 		try? await supabase.auth.signOut()
 		session = nil
 		profile = nil
+		linkedProviders = []
+		clearCachedAccount()
 		ReminderStore.shared.handleSignedOut()
 		GroupStore.shared.clear()
+		userInitiatedSignOut = false
 	}
 
 	private func identityAuthorizeURL(for provider: Provider) async throws
@@ -312,10 +329,17 @@ final class AuthService {
 
 	func signOut() async {
 		errorMessage = nil
+		userInitiatedSignOut = true
 		do {
 			try await supabase.auth.signOut()
 		} catch {
-			errorMessage = Self.friendlyAuthError(error)
+			session = nil
+			profile = nil
+			linkedProviders = []
+			clearCachedAccount()
+			ReminderStore.shared.handleSignedOut()
+			GroupStore.shared.clear()
+			userInitiatedSignOut = false
 		}
 	}
 
@@ -381,10 +405,7 @@ final class AuthService {
 	}
 
 	func loadProfile() async {
-		guard let userId else {
-			profile = nil
-			return
-		}
+		guard let userId = session?.user.id else { return }
 		do {
 			profile =
 				try await supabase
@@ -394,9 +415,37 @@ final class AuthService {
 				.single()
 				.execute()
 				.value
+			if var account = cachedAccount {
+				account.username = profile?.username ?? account.username
+				account.email = session?.user.email ?? account.email
+				cachedAccount = account
+				account.save()
+			}
 		} catch {
-			profile = nil
+			if profile == nil, let cached = cachedAccount {
+				profile = UserProfile(
+					id: cached.userId,
+					username: cached.username ?? "GeoRemind user",
+					avatarUrl: nil,
+					createdAt: nil
+				)
+			}
 		}
+	}
+
+	private func rememberAccount(from session: Session) {
+		let account = CachedAccount(
+			userId: session.user.id,
+			email: session.user.email,
+			username: profile?.username ?? cachedAccount?.username
+		)
+		cachedAccount = account
+		account.save()
+	}
+
+	private func clearCachedAccount() {
+		cachedAccount = nil
+		CachedAccount.clear()
 	}
 
 	private func reloadIdentities() async {
@@ -548,5 +597,29 @@ final class AuthService {
 			in: .whitespaces
 		)
 		return value.isEmpty ? nil : value
+	}
+}
+
+nonisolated struct CachedAccount: Codable, Sendable {
+	var userId: UUID
+	var email: String?
+	var username: String?
+
+	private static let key = "auth.cachedAccount"
+
+	static func load() -> CachedAccount? {
+		guard let data = UserDefaults.standard.data(forKey: key) else {
+			return nil
+		}
+		return try? JSONDecoder().decode(CachedAccount.self, from: data)
+	}
+
+	func save() {
+		guard let data = try? JSONEncoder().encode(self) else { return }
+		UserDefaults.standard.set(data, forKey: Self.key)
+	}
+
+	static func clear() {
+		UserDefaults.standard.removeObject(forKey: key)
 	}
 }

@@ -12,6 +12,7 @@ import UIKit
 struct Profile: View {
 	@Environment(AuthService.self) private var auth
 	@Environment(GroupStore.self) private var groups
+	@Environment(NetworkMonitor.self) private var network
 
 	@State private var editedUsername = ""
 	@State private var isEditingUsername = false
@@ -26,9 +27,29 @@ struct Profile: View {
 
 	var body: some View {
 		List {
+			if !network.isOnline {
+				Section {
+					Label {
+						VStack(alignment: .leading, spacing: 4) {
+							Text("You're offline.")
+							Text(
+								"Reminders still work on this iPhone. Groups and sync need a connection."
+							)
+							.font(.footnote)
+							.foregroundStyle(.secondary)
+						}
+					} icon: {
+						Image(systemName: "wifi.slash")
+							.foregroundStyle(.orange)
+					}
+					.padding(.vertical, 4)
+				}
+			}
 			if auth.isAuthenticated {
 				accountSection
 				groupsSection
+			} else if auth.isOfflineAccount {
+				offlineSection
 			} else {
 				guestSection
 			}
@@ -40,7 +61,7 @@ struct Profile: View {
 			Task { await uploadAvatar(item) }
 		}
 		.task {
-			if auth.isAuthenticated {
+			if auth.isAuthenticated, NetworkMonitor.shared.isOnline {
 				await groups.refresh()
 				await auth.loadProfile()
 			}
@@ -96,6 +117,39 @@ struct Profile: View {
 					.fontWeight(.semibold)
 					.frame(maxWidth: .infinity)
 			}
+		}
+	}
+
+	private var offlineSection: some View {
+		Section {
+			HStack(spacing: 14) {
+				ZStack {
+					Circle()
+						.fill(Color.accentColor.opacity(0.2))
+						.frame(width: 56, height: 56)
+					Image(systemName: "wifi.slash")
+						.font(.title2)
+						.foregroundStyle(Color.accentColor)
+				}
+				VStack(alignment: .leading, spacing: 4) {
+					Text(
+						auth.cachedAccount?.username
+							?? auth.email
+							?? "GeoRemind user"
+					)
+					.font(.headline)
+					Text("You're offline.")
+						.font(.subheadline)
+						.foregroundStyle(.secondary)
+				}
+			}
+			.padding(.vertical, 4)
+
+			Text(
+				"Reminders still work on this iPhone. Groups and sync need a connection."
+			)
+			.font(.footnote)
+			.foregroundStyle(.secondary)
 		}
 	}
 
@@ -314,4 +368,5 @@ struct Profile: View {
 	.environment(AuthService.shared)
 	.environment(GroupStore.shared)
 	.environment(AppSettings.shared)
+	.environment(NetworkMonitor.shared)
 }

@@ -14,6 +14,7 @@ struct RemindersScreen: View {
 	@Environment(ReminderStore.self) private var reminders
 	@Environment(GroupStore.self) private var groups
 	@Environment(AppSettings.self) private var settings
+	@Environment(NetworkMonitor.self) private var network
 
 	@State private var selectedPin: ReminderPin?
 
@@ -32,16 +33,39 @@ struct RemindersScreen: View {
 
 	var body: some View {
 		ZStack(alignment: .bottomTrailing) {
-			VStack(spacing: 0) {
+			List {
+				if !network.isOnline {
+					Section {
+						Label {
+							VStack(alignment: .leading, spacing: 4) {
+								Text("You're offline.")
+								Text(
+									"Reminders still work on this iPhone. Groups and sync need a connection."
+								)
+								.font(.footnote)
+								.foregroundStyle(.secondary)
+							}
+						} icon: {
+							Image(systemName: "wifi.slash")
+								.foregroundStyle(.orange)
+						}
+						.padding(.vertical, 4)
+					}
+				}
 				if GeofenceManager.shared.isOverRegionLimit {
-					PermissionBanner(
-						icon: "exclamationmark.triangle",
-						message:
-							String(
-								localized:
-									"Only 20 active reminders can be monitored in the background. You have \(GeofenceManager.shared.totalActiveCount) active."
-							),
-					)
+					Section {
+						Label {
+							Text(
+								"Only 20 active reminders can be monitored in the background. You have \(GeofenceManager.shared.totalActiveCount) active."
+							)
+							.font(.footnote)
+							.foregroundStyle(.secondary)
+						} icon: {
+							Image(systemName: "exclamationmark.triangle")
+								.foregroundStyle(.orange)
+						}
+						.padding(.vertical, 4)
+					}
 				}
 				if pins.isEmpty {
 					ContentUnavailableView(
@@ -51,101 +75,100 @@ struct RemindersScreen: View {
 							"GeoReminders you add will show up here."
 						)
 					)
-					.refreshable { await reminders.refresh() }
+					.listRowBackground(Color.clear)
+					.listRowSeparator(.hidden)
 				} else {
-					List {
-						ForEach(pins) { pin in
-							Button {
-								selectedPin = pin
-							} label: {
-								HStack(spacing: 12) {
-									Circle()
-										.fill(
-											pin.isActive
-												? Color.accentColor : Color.gray
-										)
-										.frame(width: 10, height: 10)
+					ForEach(pins) { pin in
+						Button {
+							selectedPin = pin
+						} label: {
+							HStack(spacing: 12) {
+								Circle()
+									.fill(
+										pin.isActive
+											? Color.accentColor : Color.gray
+									)
+									.frame(width: 10, height: 10)
 
-									VStack(alignment: .leading, spacing: 2) {
-										HStack(spacing: 6) {
-											Text(pin.title)
-												.font(.headline)
-												.foregroundStyle(.primary)
-											if pin.groupId != nil {
-												Image(
-													systemName: "person.2.fill"
-												)
-												.font(.caption2)
-												.foregroundStyle(.secondary)
-											}
-										}
-										if !pin.desc.isEmpty {
-											Text(pin.desc)
-												.font(.subheadline)
-												.foregroundStyle(.secondary)
-												.lineLimit(1)
-										}
-									}
-
-									Spacer()
-
-									VStack(alignment: .trailing, spacing: 2) {
-										if let meters = geofence.distance(
-											to: pin
-										) {
-											Text(
-												"\(settings.formatDistance(meters)) away"
+								VStack(alignment: .leading, spacing: 2) {
+									HStack(spacing: 6) {
+										Text(pin.title)
+											.font(.headline)
+											.foregroundStyle(.primary)
+										if pin.groupId != nil {
+											Image(
+												systemName: "person.2.fill"
 											)
-											.font(.caption.monospacedDigit())
+											.font(.caption2)
 											.foregroundStyle(.secondary)
-										} else {
-											Text("—")
-												.font(.caption)
-												.foregroundStyle(.tertiary)
 										}
 									}
-								}
-								.contentShape(Rectangle())
-							}
-							.buttonStyle(.plain)
-							.swipeActions(
-								edge: .trailing,
-								allowsFullSwipe: true
-							) {
-								if pin.isOwnedByCurrentUser {
-									Button(role: .destructive) {
-										Task { await reminders.delete(pin) }
-									} label: {
-										Label("Delete", systemImage: "trash")
+									if !pin.desc.isEmpty {
+										Text(pin.desc)
+											.font(.subheadline)
+											.foregroundStyle(.secondary)
+											.lineLimit(1)
 									}
 								}
-							}
-							.swipeActions(edge: .leading) {
-								if pin.isOwnedByCurrentUser {
-									Button {
-										Task {
-											await reminders.setActive(
-												pin,
-												isActive: !pin.isActive
-											)
-										}
-									} label: {
-										Label(
-											pin.isActive
-												? "Deactivate" : "Activate",
-											systemImage: pin.isActive
-												? "bell.slash" : "bell"
+
+								Spacer()
+
+								VStack(alignment: .trailing, spacing: 2) {
+									if let meters = geofence.distance(
+										to: pin
+									) {
+										Text(
+											"\(settings.formatDistance(meters)) away"
 										)
+										.font(.caption.monospacedDigit())
+										.foregroundStyle(.secondary)
+									} else {
+										Text("—")
+											.font(.caption)
+											.foregroundStyle(.tertiary)
 									}
-									.tint(pin.isActive ? .gray : .accentColor)
+								}
+							}
+							.contentShape(Rectangle())
+						}
+						.buttonStyle(.plain)
+						.swipeActions(
+							edge: .trailing,
+							allowsFullSwipe: true
+						) {
+							if pin.isOwnedByCurrentUser {
+								Button(role: .destructive) {
+									Task { await reminders.delete(pin) }
+								} label: {
+									Label("Delete", systemImage: "trash")
 								}
 							}
 						}
+						.swipeActions(edge: .leading) {
+							if pin.isOwnedByCurrentUser {
+								Button {
+									Task {
+										await reminders.setActive(
+											pin,
+											isActive: !pin.isActive
+										)
+									}
+								} label: {
+									Label(
+										pin.isActive
+											? "Deactivate" : "Activate",
+										systemImage: pin.isActive
+											? "bell.slash" : "bell"
+									)
+								}
+								.tint(pin.isActive ? .gray : .accentColor)
+							}
+						}
 					}
-					.listStyle(.insetGrouped)
-					.refreshable { await reminders.refresh() }
 				}
 			}
+			.listStyle(.insetGrouped)
+			.refreshable { await reminders.refresh() }
 
 			Button {
 				showingAdd = true
@@ -171,7 +194,9 @@ struct RemindersScreen: View {
 			while !Task.isCancelled {
 				try? await Task.sleep(for: .seconds(15))
 				guard !Task.isCancelled else { break }
-				await reminders.refresh()
+				if network.isOnline {
+					await reminders.refresh()
+				}
 			}
 		}
 	}
@@ -184,4 +209,5 @@ struct RemindersScreen: View {
 	.environment(ReminderStore.shared)
 	.environment(GroupStore.shared)
 	.environment(AppSettings.shared)
+	.environment(NetworkMonitor.shared)
 }

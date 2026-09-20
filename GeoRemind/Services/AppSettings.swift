@@ -224,3 +224,15 @@ final class AppSettings {
 func loc(_ value: String.LocalizationValue) -> String {
 	String(localized: value)
 }
+
+func isIgnorableNetworkError(_ error: Error) -> Bool {
+	if error is CancellationError { return true }
+	let ns = error as NSError
+	if ns.domain == NSURLErrorDomain { return true }
+	let text = error.localizedDescription.lowercased()
+	return text.contains("offline")
+		|| text.contains("internet")
+		|| text.contains("not connected")
+		|| text.contains("network")
+		|| text.contains("cancellation")
+}

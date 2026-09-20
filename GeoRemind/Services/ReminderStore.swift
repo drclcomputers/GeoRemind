@@ -28,6 +28,7 @@ final class ReminderStore {
 	}
 
 	func refresh() async {
+		guard NetworkMonitor.shared.isOnline else { return }
 		await pullFromCloud(showLoading: true)
 		startRealtime()
 	}
@@ -49,22 +50,40 @@ final class ReminderStore {
 				.order("created_at", ascending: false)
 				.execute()
 				.value
-			pins = cloud
-			PinCache.save(cloud)
-			GeofenceManager.shared.syncRegions(pins: cloud)
+			var merged = cloud
+			let pending = PendingSync.load()
+			if !pending.deleted.isEmpty {
+				merged.removeAll { pending.deleted.contains($0.id) }
+			}
+			for upsert in pending.upserts {
+				if let index = merged.firstIndex(where: { $0.id == upsert.id })
+				{
+					merged[index] = upsert
+				} else {
+					merged.insert(upsert, at: 0)
+				}
+			}
+			pins = merged
+			PinCache.save(merged)
+			GeofenceManager.shared.syncRegions(pins: merged)
 			errorMessage = nil
+			await flushPending(pending)
 		} catch {
-			errorMessage = error.localizedDescription
+			if !isIgnorableNetworkError(error) {
+				errorMessage = error.localizedDescription
+			}
 		}
 	}
 
 	func handleSignedIn() async {
 		await uploadLocalPinsToCloud()
+		await flushPending(PendingSync.load())
 		await refresh()
 	}
 
 	func handleSignedOut() {
 		clear()
+		PendingSync.clear()
 	}
 
 	func snapshotGuestPins() {
@@ -141,7 +160,7 @@ final class ReminderStore {
 		let pin = ReminderPin(
 			id: existingId ?? UUID(),
 			ownerId: ownerId,
-			groupId: AuthService.shared.isAuthenticated ? groupId : nil,
+			groupId: AuthService.shared.hasAccount ? groupId : nil,
 			title: title,
 			desc: desc,
 			latitude: latitude,
@@ -152,7 +171,21 @@ final class ReminderStore {
 			notifyOnExit: notifyOnExit
 		)
 
-		if AuthService.shared.isAuthenticated {
+		if let index = pins.firstIndex(where: { $0.id == pin.id }) {
+			pins[index] = pin
+		} else {
+			pins.insert(pin, at: 0)
+		}
+		persistAndSync()
+
+		guard AuthService.shared.isAuthenticated else {
+			if AuthService.shared.hasAccount {
+				PendingSync.queueUpsert(pin)
+			}
+			return
+		}
+
+		do {
 			let write = ReminderInsert(
 				id: pin.id,
 				ownerId: ownerId,
@@ -176,13 +209,11 @@ final class ReminderStore {
 				.value
 			if let index = pins.firstIndex(where: { $0.id == inserted.id }) {
 				pins[index] = inserted
-			} else {
-				pins.insert(inserted, at: 0)
 			}
-		} else {
-			pins.insert(pin, at: 0)
+			persistAndSync()
+		} catch {
+			PendingSync.queueUpsert(pin)
 		}
-		persistAndSync()
 	}
 
 	func update(_ pin: ReminderPin) async throws {
@@ -193,7 +224,12 @@ final class ReminderStore {
 
 		guard AuthService.shared.isAuthenticated,
 			pin.ownerId == AuthService.shared.userId
-		else { return }
+		else {
+			if AuthService.shared.hasAccount {
+				PendingSync.queueUpsert(pin)
+			}
+			return
+		}
 
 		let write = ReminderUpdate(
 			title: pin.title,
@@ -205,20 +241,24 @@ final class ReminderStore {
 			groupId: pin.groupId
 		)
 
-		let updated: ReminderPin =
-			try await supabase
-			.from("reminders")
-			.update(write)
-			.eq("id", value: pin.id)
-			.select()
-			.single()
-			.execute()
-			.value
+		do {
+			let updated: ReminderPin =
+				try await supabase
+				.from("reminders")
+				.update(write)
+				.eq("id", value: pin.id)
+				.select()
+				.single()
+				.execute()
+				.value
 
-		if let index = pins.firstIndex(where: { $0.id == pin.id }) {
-			pins[index] = updated
+			if let index = pins.firstIndex(where: { $0.id == pin.id }) {
+				pins[index] = updated
+			}
+			persistAndSync()
+		} catch {
+			PendingSync.queueUpsert(pin)
 		}
-		persistAndSync()
 	}
 
 	func setActive(_ pin: ReminderPin, isActive: Bool) async {
@@ -228,19 +268,34 @@ final class ReminderStore {
 			pins[index].isActive = isActive
 			persistAndSync()
 		}
-		guard AuthService.shared.isAuthenticated else { return }
+		guard AuthService.shared.isAuthenticated else {
+			if AuthService.shared.hasAccount {
+				PendingSync.queueUpsert(next)
+			}
+			return
+		}
 		try? await update(next)
 	}
 
 	func delete(_ pin: ReminderPin) async {
 		pins.removeAll { $0.id == pin.id }
 		persistAndSync()
-		guard AuthService.shared.isAuthenticated else { return }
-		_ = try? await supabase
-			.from("reminders")
-			.delete()
-			.eq("id", value: pin.id)
-			.execute()
+		guard AuthService.shared.isAuthenticated else {
+			if AuthService.shared.hasAccount {
+				PendingSync.queueDelete(pin.id)
+			}
+			return
+		}
+		do {
+			_ =
+				try await supabase
+				.from("reminders")
+				.delete()
+				.eq("id", value: pin.id)
+				.execute()
+		} catch {
+			PendingSync.queueDelete(pin.id)
+		}
 	}
 
 	func pin(id: UUID) -> ReminderPin? {
@@ -277,12 +332,49 @@ final class ReminderStore {
 
 	private func persistAndSync() {
 		PinCache.save(pins)
-		if AuthService.shared.session == nil {
+		if !AuthService.shared.hasAccount {
 			PinCache.savePendingGuest(
 				pins.filter { $0.ownerId == LocalIdentity.ownerId }
 			)
 		}
 		GeofenceManager.shared.syncRegions(pins: pins)
+	}
+
+	private func flushPending(_ pending: PendingSync) async {
+		guard AuthService.shared.isAuthenticated, pending.hasWork else {
+			return
+		}
+		for id in pending.deleted {
+			do {
+				_ = try await supabase.from("reminders").delete().eq(
+					"id",
+					value: id
+				).execute()
+			} catch {
+				return
+			}
+		}
+		for pin in pending.upserts where !pending.deleted.contains(pin.id) {
+			let write = ReminderInsert(
+				id: pin.id,
+				ownerId: pin.ownerId,
+				groupId: pin.groupId,
+				title: pin.title,
+				description: pin.desc,
+				latitude: pin.latitude,
+				longitude: pin.longitude,
+				radius: pin.radius,
+				isActive: pin.isActive,
+				notifyOnEntry: pin.notifyOnEntry,
+				notifyOnExit: pin.notifyOnExit
+			)
+			do {
+				_ = try await supabase.from("reminders").upsert(write).execute()
+			} catch {
+				return
+			}
+		}
+		PendingSync.clear()
 	}
 }
 
@@ -343,6 +435,59 @@ enum PinCache {
 
 	static func clearPendingGuest() {
 		try? FileManager.default.removeItem(at: pendingGuestURL)
+	}
+}
+
+struct PendingSync: Codable {
+	var deleted: [UUID] = []
+	var upserts: [ReminderPin] = []
+
+	var hasWork: Bool { !deleted.isEmpty || !upserts.isEmpty }
+
+	private static var fileURL: URL {
+		let folder = FileManager.default.urls(
+			for: .applicationSupportDirectory,
+			in: .userDomainMask
+		).first!
+		return folder.appendingPathComponent("georemind-pending-sync.json")
+	}
+
+	static func load() -> PendingSync {
+		guard let data = try? Data(contentsOf: fileURL),
+			let value = try? JSONCoders.decoder.decode(
+				PendingSync.self,
+				from: data
+			)
+		else {
+			return PendingSync()
+		}
+		return value
+	}
+
+	func save() {
+		guard let data = try? JSONCoders.encoder.encode(self) else { return }
+		try? data.write(to: Self.fileURL, options: [.atomic])
+	}
+
+	static func clear() {
+		try? FileManager.default.removeItem(at: fileURL)
+	}
+
+	static func queueUpsert(_ pin: ReminderPin) {
+		var pending = load()
+		pending.deleted.removeAll { $0 == pin.id }
+		pending.upserts.removeAll { $0.id == pin.id }
+		pending.upserts.append(pin)
+		pending.save()
+	}
+
+	static func queueDelete(_ id: UUID) {
+		var pending = load()
+		pending.upserts.removeAll { $0.id == id }
+		if !pending.deleted.contains(id) {
+			pending.deleted.append(id)
+		}
+		pending.save()
 	}
 }
 

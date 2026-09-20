@@ -17,6 +17,7 @@ struct GeoRemindApp: App {
 		UNUserNotificationCenter.current().delegate =
 			NotificationDelegate.shared
 		GeofenceManager.shared.preload()
+		NetworkMonitor.shared.start()
 		AuthService.shared.start()
 	}
 
@@ -27,6 +28,7 @@ struct GeoRemindApp: App {
 				.environment(ReminderStore.shared)
 				.environment(GroupStore.shared)
 				.environment(AppSettings.shared)
+				.environment(NetworkMonitor.shared)
 				.onOpenURL { url in
 					Task {
 						if url.host == "join" {
