@@ -21,6 +21,8 @@
 		<string>ja</string>
 		<string>zh-Hans</string>
 	</array>
+    <key>NSSiriUsageDescription</key>
+	<string>GeoRemind uses Siri to add a reminder at your current location.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
